@@ -1,0 +1,39 @@
+inherit_from: .rubocop_todo.yml
+
+plugins:
+  - rubocop-rake
+  - rubocop-rspec
+
+AllCops:
+  EnabledByDefault: true
+  TargetRubyVersion: 3.4
+
+Layout/LineLength: { Max: 80 }
+Style/ClassAndModuleChildren: { EnforcedStyle: compact }
+Style/ClassMethodsDefinitions: { EnforcedStyle: self_class }
+Style/MethodCallWithArgsParentheses:
+  AllowedMethods:
+    - describe
+    - not_to
+    - puts
+    - raise
+    - to
+Style/StringLiterals: { Enabled: true, EnforcedStyle: double_quotes }
+Style/StringLiteralsInInterpolation:
+  Enabled: true
+  EnforcedStyle: double_quotes
+Style/SymbolArray: { EnforcedStyle: brackets }
+Style/TrailingCommaInArguments: { EnforcedStyleForMultiline: consistent_comma }
+Style/TrailingCommaInArrayLiteral: { EnforcedStyleForMultiline: consistent_comma }
+Style/TrailingCommaInHashLiteral: { EnforcedStyleForMultiline: consistent_comma }
+Style/HashLookupMethod: { EnforcedStyle: fetch }
+Style/WordArray: { EnforcedStyle: brackets }
+
+Bundler/GemComment: { Enabled: false }
+Bundler/GemVersion: { Enabled: false }
+Layout/SingleLineBlockChain: { Enabled: false }
+Lint/ConstantResolution: { Enabled: false }
+Style/ConstantVisibility: { Enabled: false }
+Style/Copyright: { Enabled: false }
+Style/InlineComment: { Enabled: false }
+Style/MissingElse: { Enabled: false }

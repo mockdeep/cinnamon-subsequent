@@ -27,7 +27,10 @@ class Config
 
   def initialize(path = DEFAULT_PATH)
     @path = path
-    @data = deep_merge(DEFAULTS, read_file)
+    # deep_dup the defaults first: Hash#merge keeps base's value object for any
+    # section the file omits, so without this every Config would share (and a
+    # setter would mutate) DEFAULTS' nested hashes.
+    @data = deep_merge(deep_dup(DEFAULTS), read_file)
   end
 
   def trello_key  = dig("trello", "key")
@@ -75,6 +78,12 @@ class Config
     JSON.parse(File.read(path))
   rescue JSON::ParserError => e
     raise "Config at #{path} is not valid JSON: #{e.message}"
+  end
+
+  def deep_dup(hash)
+    hash.each_with_object({}) do |(key, value), copy|
+      copy[key] = value.is_a?(Hash) ? deep_dup(value) : value
+    end
   end
 
   def deep_merge(base, override)

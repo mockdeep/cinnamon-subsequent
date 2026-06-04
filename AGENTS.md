@@ -35,8 +35,24 @@ For visual checks, launch with `nohup … &`, inspect, then kill. Useful tools:
   matches your own shell command line and kills the command itself. Instead
   iterate `pgrep -x ruby` and check `/proc/$pid/cmdline`, or use a saved PID.
 
-There is no automated test suite; verification is the smoke test plus visual
-inspection.
+### Automated tests
+
+```
+bundle exec rspec    # the spec suite
+bundle exec rake     # spec + rubocop (the default task)
+```
+
+RSpec covers the **pure, non-GTK core only** — `lib/config.rb`,
+`lib/trello_client.rb`, `lib/board_fetch.rb` — at 100% line + branch coverage
+(SimpleCov reports it; there is **no** coverage gate). The GTK/UI/X11 layer
+(`app.rb`, `sync.rb`, `lib/ui/*`, `lib/x11/*`) is deliberately **not**
+unit-tested: it needs a real display, so it's verified by the smoke test plus
+visual inspection instead. `spec/support/coverage.rb` filters that layer out of
+the report. Trello calls are stubbed with WebMock (no real network in specs).
+
+RuboCop uses a strict `EnabledByDefault: true` config; pre-existing offenses are
+shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
+"nothing to clean up."
 
 ## Hard constraints & gotchas
 
