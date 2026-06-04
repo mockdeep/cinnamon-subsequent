@@ -1,0 +1,11 @@
+# Bundler / gems
+/vendor/
+/.bundle/
+
+# Editors / language servers
+/.ruby-lsp/
+
+# OS / misc
+*.log
+*~
+.DS_Store
