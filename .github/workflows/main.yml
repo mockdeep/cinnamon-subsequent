@@ -1,0 +1,33 @@
+name: Ruby
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Ruby
+
+    steps:
+    - uses: actions/checkout@v4
+    # The gtk3 gem builds native extensions against the GTK3 dev headers, so
+    # they must be present before bundler-cache runs `bundle install`.
+    - name: Install GTK3 dev headers
+      run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '4.0'
+        bundler-cache: true
+    - name: Run the default task
+      run: bundle exec rake
+    - uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: coverage
+        if-no-files-found: error
+        include-hidden-files: true
