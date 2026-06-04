@@ -29,11 +29,18 @@ module UI
       @spinner = Gtk::Spinner.new
       @spinner.no_show_all = true
 
-      # Refresh and spinner share one trailing slot; only one shows at a time,
-      # so the row's right edge stays put.
-      trailing = Gtk::Box.new(:horizontal, 0)
+      @collapse = Gtk::Button.new(label: "»")
+      @collapse.can_focus = false
+      @collapse.tooltip_text = "Collapse"
+      @collapse.style_context.add_class("collapse")
+      @collapse.signal_connect("clicked") { @on_collapse&.call }
+
+      # Refresh and spinner share one slot (only one shows at a time); the
+      # collapse button sits at the far right, nearest the screen edge.
+      trailing = Gtk::Box.new(:horizontal, 4)
       trailing.pack_start(@spinner, expand: false, fill: false, padding: 0)
       trailing.pack_start(@refresh, expand: false, fill: false, padding: 0)
+      trailing.pack_start(@collapse, expand: false, fill: false, padding: 0)
 
       pack_start(@board, expand: true, fill: true, padding: 0)
       pack_start(@lane, expand: true, fill: true, padding: 0)
@@ -43,6 +50,7 @@ module UI
     def on_board_change(&block) = @on_board_change = block
     def on_lane_change(&block)  = @on_lane_change = block
     def on_refresh(&block)      = @on_refresh = block
+    def on_collapse(&block)     = @on_collapse = block
 
     def set_boards(items, active_id) = @board.set_items(items, active_id)
     def set_lanes(items, active_id)  = @lane.set_items(items, active_id)

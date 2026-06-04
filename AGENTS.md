@@ -16,13 +16,27 @@ it (pushed to Trello immediately). Single process, Ruby + GTK3.
 It's a GUI app on **X11** (`DISPLAY=:0`), so you can launch it and see it on
 screen — prefer that over guessing.
 
+Build deps: the `gtk3` gem builds native extensions and needs **`libgtk-3-dev`**
+(`sudo apt install libgtk-3-dev`); the rest of the chain is already present.
+Ruby is mise-managed — always run via `bundle exec`.
+
 ```
 bundle exec ruby bin/todo-sidebar          # run it
 DISPLAY=:0 timeout 6 bundle exec ruby bin/todo-sidebar   # smoke test: exit 124 = booted clean
 ```
 
-For visual checks, launch it with `nohup … &`, inspect, then kill it. Window
-geometry is checkable with `xwininfo -name cinnamon-subsequent`.
+For visual checks, launch with `nohup … &`, inspect, then kill. Useful tools:
+
+- `xwininfo -name cinnamon-subsequent` — window geometry.
+- **Screenshot + pixel-sample** to diagnose rendering (how the right-edge line
+  was found): `import -window root -crop WxH+X+Y out.png`, then
+  `convert out.png -format '%[pixel:p{0,0}]' info:-`.
+- **Killing instances:** do NOT `pkill -f bin/todo-sidebar` — that pattern
+  matches your own shell command line and kills the command itself. Instead
+  iterate `pgrep -x ruby` and check `/proc/$pid/cmdline`, or use a saved PID.
+
+There is no automated test suite; verification is the smoke test plus visual
+inspection.
 
 ## Hard constraints & gotchas
 
@@ -39,10 +53,23 @@ geometry is checkable with `xwininfo -name cinnamon-subsequent`.
 - **Threading.** Network runs on a worker thread via `Sync.run`; results return
   to the UI **only** through `GLib::Idle.add`. Never touch widgets off the main
   thread.
+- **The window is permanently in CSS `:backdrop` state** — it never takes focus
+  (`accept_focus = false`). When writing CSS, remember normal/`:hover` states may
+  behave unexpectedly; the widget path shows `window:backdrop`.
 - **Dropdowns are Popovers, not ComboBoxes** (`lib/ui/dropdown.rb`). Combo menus
   fly off-screen to the left when the window is flush against the right edge, and
   their minimum width forced the window wider than 320px. Do **not** "simplify"
   back to `Gtk::ComboBoxText`.
+- **`DockWindow::EDGE_BLEED` is load-bearing — don't "simplify" it away.** The
+  GTK theme paints a ~1px light line on the window's right edge that NO CSS
+  removes (it's not a border/shadow/scrollbar/background — verified by walking
+  the widget tree and pixel-sampling). The window is rendered a few px wider than
+  its visible width so that column is clipped off the screen edge; the strut
+  still reserves the true width. Trade-off: on scrolling lanes a few px of the
+  scrollbar sit off-screen (wheel/trackpad scrolling is unaffected).
+- **Collapse/expand** (the `»` button → thin strip via a `Gtk::Stack`) is an
+  instant width swap. Animating the window width was tried and **abandoned as
+  janky** — GTK window-resize tweens stutter; don't reattempt.
 - **Gems are global (mise gemset), not vendored.** Never run
   `bundle config path vendor/bundle` — this project lives in Dropbox and 80MB of
   compiled native extensions should not sync.
