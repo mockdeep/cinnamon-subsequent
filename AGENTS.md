@@ -70,6 +70,11 @@ inspection.
 - **Collapse/expand** (the `»` button → thin strip via a `Gtk::Stack`) is an
   instant width swap. Animating the window width was tried and **abandoned as
   janky** — GTK window-resize tweens stutter; don't reattempt.
+- **`Gtk::Label` link markup ≠ Pango markup.** Item labels render URLs as a
+  clickable `(<a href="…">link</a>)` (`ItemRow#linkify`). The `<a>` tag is a
+  *GTK* extension — `Pango.parse_markup` rejects it (`Unknown tag 'a'`), so
+  validate label markup by setting it on a real `Gtk::Label`, not via Pango.
+  This binding also has no `GLib::Markup`, so href escaping is hand-rolled.
 - **Gems are global (mise gemset), not vendored.** Never run
   `bundle config path vendor/bundle` — this project lives in Dropbox and 80MB of
   compiled native extensions should not sync.

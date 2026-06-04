@@ -74,7 +74,8 @@ module UI
     def apply_state(state)
       complete = (state == "complete")
       suppressed { @check.active = complete }
-      @label.markup = complete ? "<s>#{escape(@item.name)}</s>" : escape(@item.name)
+      markup = linkify(@item.name)
+      @label.markup = complete ? "<s>#{markup}</s>" : markup
       complete ? style_context.add_class("done") : style_context.remove_class("done")
     end
 
@@ -101,6 +102,20 @@ module UI
 
     def escape(text)
       text.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+    end
+
+    # Collapse each http(s) word to a shortened, clickable "(link)". Non-URL
+    # words are escaped as visible text; URLs are escaped for use inside the
+    # href attribute. Gtk::Label's default activate-link handler opens the URL
+    # in the browser.
+    def linkify(text)
+      text.split.map do |word|
+        if word.start_with?("http")
+          "(<a href=\"#{escape(word).gsub("\"", "&quot;")}\">link</a>)"
+        else
+          escape(word)
+        end
+      end.join(" ")
     end
   end
 end
