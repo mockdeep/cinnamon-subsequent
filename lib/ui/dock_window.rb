@@ -99,6 +99,29 @@ module UI
         .item-row.failed label { color: #ff8a8a; }
         .empty-state { color: #9aa3b2; font-style: italic; }
         .loading { color: #9aa3b2; }
+        .refresh { padding: 2px 8px; font-size: 15px; min-width: 0; }
+
+        /* Flat, dark controls that blend into the sidebar. */
+        .topbar .dropdown,
+        .topbar button.refresh {
+          background-image: none;
+          background-color: #2a3140;
+          color: #e6e6e6;
+          border: 1px solid #3a4150;
+          box-shadow: none;
+          text-shadow: none;
+          padding: 2px 6px;
+        }
+        .topbar .dropdown:hover,
+        .topbar button.refresh:hover { background-color: #333b4d; }
+        .topbar .dropdown .caret { color: #9aa3b2; }
+
+        /* Popover dropdown list */
+        popover { background-color: #232a36; padding: 2px; }
+        .dropdown-list { background-color: transparent; }
+        .dropdown-list row { color: #e6e6e6; }
+        .dropdown-list row:hover { background-color: #2f3848; }
+        .dropdown-list row:selected { background-color: #34507e; color: #ffffff; }
         checkbutton check { min-width: 14px; min-height: 14px; }
       CSS
       provider = Gtk::CssProvider.new

@@ -1,5 +1,8 @@
 # cinnamon-subsequent
 
+> Working on the code (human or AI agent)? Read [AGENTS.md](AGENTS.md) first — it
+> captures the non-obvious constraints and gotchas.
+
 A persistent to-do **sidebar** for the Linux Mint / Cinnamon desktop, backed by
 Trello. It pins a full-height column to the right edge of the screen that:
 
