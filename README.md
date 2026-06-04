@@ -13,7 +13,8 @@ Trello. It pins a full-height column to the right edge of the screen that:
   only **incomplete** items;
 - lets you **click an item to complete it** (pushed to Trello immediately, with a
   spinner while it's in flight and undo by clicking again);
-- has **Board** and **Lane** dropdowns and a **Refresh** button up top.
+- has **Board** and **Lane** dropdowns and a **Refresh** button up top (Refresh
+  reloads everything — boards, lanes, and the card).
 
 It's deliberately X11-only (Cinnamon/Muffin is X11) and GTK **3** (GTK4 dropped
 the window-manager hint APIs a dock needs).
@@ -29,9 +30,10 @@ the window-manager hint APIs a dock needs).
 
 ## Setup
 
-1. **Install gems** (vendored into `vendor/bundle`):
+1. **Install gems** (into the active Ruby's global gemset — *not* vendored; the
+   repo lives in Dropbox and shouldn't sync compiled extensions, see
+   [AGENTS.md](AGENTS.md)):
    ```
-   bundle config set --local path vendor/bundle
    bundle install
    ```
 
@@ -87,4 +89,8 @@ rm ~/.config/autostart/cinnamon-subsequent.desktop
   width matches the on-screen width on 2× displays.
 - The sidebar reads the **first card** of the selected lane; its checklists become
   the list. Completed items stay visible (struck-through, undoable) until the next
-  **Refresh**, which refetches incomplete-only.
+  **Refresh**.
+- **Refresh** reloads the whole cascade — boards, lanes, and the card (refetching
+  incomplete-only) — while keeping your current selection. This is also the
+  recovery path when the sidebar starts with **no network**: it shows an error and
+  empty dropdowns, and a single **Refresh** once you're online fills everything in.

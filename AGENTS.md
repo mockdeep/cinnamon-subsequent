@@ -88,7 +88,9 @@ inspection.
 - **Trello credentials + selected board/lane:** `~/.config/cinnamon-subsequent/config.json`
   (`0600`). Never in the repo.
 - No on-disk task cache: a deliberate choice — show a fresh loader rather than a
-  potentially stale list (offline isn't a concern here).
+  potentially stale list. Offline isn't handled by caching but by **refresh
+  recovery** (see "The Trello model" below): a start with no network leaves empty
+  dropdowns that a single Refresh repopulates once the connection is back.
 
 ## The Trello model, briefly
 
@@ -97,6 +99,14 @@ checklist. Completing/uncompleting an item is `PUT /cards/{id}/checkItem/{id}`
 with `state=complete|incomplete`, pushed immediately on click (spinner while in
 flight; completed rows stay visible and undoable until the next refresh, which
 refetches incomplete-only).
+
+**Refresh re-enters the cascade at the top** (`App#refresh_view` → `load_boards`),
+not at the leaf card fetch — so the Board/Lane dropdowns repopulate, not just the
+checklist. This is deliberate: it's the recovery path for a cold start that failed
+with **no network** (boards/lanes never loaded), where a leaf-only refresh would
+leave the dropdowns permanently empty even after reconnecting. The persisted
+`board_id`/`lane_id` keep the current selection across the reload. Cost: every
+refresh is the full 3-call cascade, not one card fetch.
 
 ## Architecture map
 

@@ -94,8 +94,12 @@ class App
     fetch_and_render
   end
 
+  # Reload the whole cascade (boards → lanes → cards) so the dropdowns
+  # repopulate too — not just the leaf checklist. This also recovers a cold
+  # start that failed offline, where boards/lanes never loaded. The persisted
+  # board_id/lane_id keep the current selection.
   def refresh_view
-    fetch_and_render if @config.lane_id
+    load_boards if @client
   end
 
   def fetch_and_render
