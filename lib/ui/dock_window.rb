@@ -16,6 +16,32 @@ module UI
     # that column is clipped off-screen; content still fills to the visible edge.
     EDGE_BLEED = 3
 
+    # Window placement (logical px) plus the reserved strut (device px).
+    Layout = Struct.new(:x,
+                        :y,
+                        :width,
+                        :height,
+                        :strut_width,
+                        :strut_start_y,
+                        :strut_end_y,
+                        keyword_init: true)
+
+    # GTK lays out in logical px but X11 struts are device px, so the strut
+    # values are scaled by the display `scale`: on a HiDPI screen (scale > 1)
+    # we'd otherwise reserve too little and maximized windows would overlap.
+    def self.layout_for(monitor:, workarea:, screen_width:, dock_width:, scale:)
+      right_edge = monitor.x + monitor.width
+      Layout.new(
+        x: right_edge - dock_width,
+        y: workarea.y,
+        width: dock_width + EDGE_BLEED,
+        height: workarea.height,
+        strut_width: (screen_width - right_edge + dock_width) * scale,
+        strut_start_y: workarea.y * scale,
+        strut_end_y: (workarea.y + workarea.height) * scale - 1,
+      )
+    end
+
     def initialize(edge: :right, width: 320, header:)
       super(:toplevel)
       @edge = edge
@@ -88,25 +114,21 @@ module UI
     # Position, size, and strut for the current @dock_width (expanded or
     # collapsed). Re-run whenever the width changes.
     def relayout
-      geo, wa, screen_w = geometry
-      x = geo.x + geo.width - @dock_width
-
-      # Render a few px wider so the theme's light right-edge column is clipped
-      # off-screen; the visible width is still @dock_width.
-      rendered = @dock_width + EDGE_BLEED
-      move(x, wa.y)
-      set_size_request(rendered, wa.height)
-      resize(rendered, wa.height)
-
-      # GTK lays out in logical pixels; X11 struts are in device pixels.
-      # On a HiDPI display (scale_factor > 1) we must convert, or we'd reserve
-      # too little and maximized windows would overlap the dock.
-      scale = window.scale_factor
-      right = (screen_w - (geo.x + geo.width) + @dock_width) * scale
+      monitor, workarea, screen_width = geometry
+      layout = self.class.layout_for(
+        monitor: monitor,
+        workarea: workarea,
+        screen_width: screen_width,
+        dock_width: @dock_width,
+        scale: window.scale_factor,
+      )
+      move(layout.x, layout.y)
+      set_size_request(layout.width, layout.height)
+      resize(layout.width, layout.height)
       X11::Strut.apply_right(window.xid,
-                             width: right,
-                             start_y: wa.y * scale,
-                             end_y: (wa.y + wa.height) * scale - 1)
+                             width: layout.strut_width,
+                             start_y: layout.strut_start_y,
+                             end_y: layout.strut_end_y)
     end
 
     def geometry

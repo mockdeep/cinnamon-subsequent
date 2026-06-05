@@ -61,9 +61,12 @@ it; there is **no** coverage gate):
   `widget.show_all` first or visibility/stack-switching won't read back.
 - `lib/x11/strut.rb` — the Xlib FFI `Lib` module is stubbed (`stub_const`), so
   the spec asserts the strut **arrays/atoms** without a real X server.
-- `dock_window.rb` — `relayout`/`apply_dock_behaviour` (real Xlib: XID, struts,
-  keep-below) are tested with `relayout`/`X11::Strut`/`geometry` stubbed; the
-  HiDPI scale math in `relayout` is asserted against fake monitor geometry.
+- `dock_window.rb` — `collapse`/`expand`/`apply_dock_behaviour` run for real
+  under xvfb (real `relayout`, including the Xlib strut), so nothing is stubbed
+  there. The HiDPI scale math is extracted into the pure `DockWindow.layout_for`
+  and tested in isolation at `scale: 2` (xvfb only ever reports scale 1). Note
+  `strut_spec` resets `X11::Strut`'s memoized `@display` in an `after`, so its
+  stubbed display can't leak into these real Xlib calls.
 
 **The full suite needs a display.** Requiring any `ui/*` file (or `app`, which
 pulls them in) *defines* a `Gtk::*` subclass, which calls `Gtk.init` and fails

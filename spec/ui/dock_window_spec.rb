@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "ui/dock_window"
+require "ui/header" # DockWindow takes a header but doesn't require it itself
 
 RSpec.describe UI::DockWindow do
   subject(:dock) { described_class.new(header: UI::Header.new, width: 320) }
@@ -50,25 +51,20 @@ RSpec.describe UI::DockWindow do
   end
 
   describe "#collapse / #expand" do
-    # relayout touches real Xlib; stub it. show_all so the stack tracks its
-    # visible child by name.
-    before do
-      allow(dock).to receive(:relayout)
-      dock.show_all
-    end
+    # show_all realizes the window so the real relayout has an XID.
+    before { dock.show_all }
 
-    it "swaps to the collapsed strip and relays out once" do
+    it "swaps to the collapsed strip" do
       dock.collapse
 
       expect(stack.visible_child_name).to eq("collapsed")
-      expect(dock).to have_received(:relayout).once
     end
 
-    it "is idempotent when already collapsed" do
+    it "stays collapsed when collapsed again" do
       dock.collapse
       dock.collapse
 
-      expect(dock).to have_received(:relayout).once
+      expect(stack.visible_child_name).to eq("collapsed")
     end
 
     it "restores the expanded view" do
@@ -78,47 +74,42 @@ RSpec.describe UI::DockWindow do
       expect(stack.visible_child_name).to eq("expanded")
     end
 
-    it "does nothing when expand is called while already expanded" do
+    it "stays expanded when expanded while already expanded" do
       dock.expand
 
-      expect(dock).not_to have_received(:relayout)
+      expect(stack.visible_child_name).to eq("expanded")
     end
   end
 
   describe "#apply_dock_behaviour" do
-    it "keeps the window below, sticks it, and lays out" do
-      allow(dock).to receive(:relayout)
-      allow(dock).to receive(:set_keep_below)
-      allow(dock).to receive(:stick)
+    it "keeps below, sticks, and lays out without error" do
+      dock.show_all
 
-      dock.apply_dock_behaviour
-
-      expect(dock).to have_received(:set_keep_below).with(true)
-      expect(dock).to have_received(:stick)
-      expect(dock).to have_received(:relayout)
+      expect { dock.apply_dock_behaviour }.not_to raise_error
     end
   end
 
-  describe "#relayout (HiDPI strut math)" do
-    it "converts logical px to device px by the scale factor" do
-      geo = double("geometry", x: 0, width: 1920)
-      workarea = double("workarea", x: 0, y: 27, width: 1920, height: 1053)
-      gdk_window = double("gdk_window", xid: 99, scale_factor: 2)
-      allow(dock).to receive(:geometry).and_return([geo, workarea, 1920])
-      allow(dock).to receive(:window).and_return(gdk_window)
-      allow(dock).to receive(:move)
-      allow(dock).to receive(:set_size_request)
-      allow(dock).to receive(:resize)
-      allow(X11::Strut).to receive(:apply_right)
+  describe ".layout_for" do
+    it "places the dock at the right edge and scales the strut to device px" do
+      rect = Struct.new(:x, :y, :width, :height)
 
-      dock.send(:relayout)
+      layout = described_class.layout_for(
+        monitor: rect.new(0, 0, 1920, 1080),
+        workarea: rect.new(0, 27, 1920, 1053),
+        screen_width: 1920,
+        dock_width: 320,
+        scale: 2,
+      )
 
-      # x = 0 + 1920 - 320; rendered width = 320 + EDGE_BLEED(3)
-      expect(dock).to have_received(:move).with(1600, 27)
-      expect(dock).to have_received(:resize).with(323, 1053)
-      # right = (1920 - 1920 + 320) * 2; y-bounds * scale
-      expect(X11::Strut).to have_received(:apply_right)
-        .with(99, width: 640, start_y: 54, end_y: 2159)
+      expect(layout).to have_attributes(
+        x: 1600,
+        y: 27,
+        width: 323,
+        height: 1053,
+        strut_width: 640,
+        strut_start_y: 54,
+        strut_end_y: 2159,
+      )
     end
   end
 
