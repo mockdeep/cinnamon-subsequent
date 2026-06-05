@@ -33,6 +33,36 @@ module Factories
     }.merge(stringify(overrides))
   end
 
+  # View-model structs the UI renders (output of BoardFetch).
+  def make_item(**overrides)
+    BoardFetch::Item.new(
+      id: "item-1",
+      card_id: "card-1",
+      checklist_id: "cl-1",
+      name: "Item One",
+      state: "incomplete",
+      **overrides,
+    )
+  end
+
+  def make_group(**overrides)
+    BoardFetch::Group.new(
+      checklist_id: "cl-1",
+      name: "Checklist",
+      items: [make_item],
+      **overrides,
+    )
+  end
+
+  def make_result(**overrides)
+    BoardFetch::Result.new(
+      card_name: "Card",
+      groups: [make_group],
+      empty_reason: nil,
+      **overrides,
+    )
+  end
+
   private
 
   def stringify(hash)

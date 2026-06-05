@@ -41,7 +41,7 @@ module UI
     private
 
     def build_face
-      remove(child) if child # drop MenuButton's default arrow image
+      remove(child) # drop MenuButton's default arrow image (always present)
 
       face = Gtk::Box.new(:horizontal, 4)
       @label = Gtk::Label.new("")

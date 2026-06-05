@@ -7,8 +7,7 @@ require "tmpdir"
 #
 # Only the UI boundary (header/window/row) is doubled. Config, TrelloClient, and
 # BoardFetch run for real: Config off a temp file, Trello over WebMock-stubbed
-# HTTP (mirroring spec/trello_client_spec.rb and ../subsequent's integration
-# specs). Sync.run is stubbed to run inline so the async cascade resolves
+# HTTP. Sync.run is stubbed to run inline so the async cascade resolves
 # synchronously.
 require "app"
 
