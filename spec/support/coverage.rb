@@ -8,11 +8,10 @@ SimpleCov.start do
   add_filter "_spec.rb"
   add_filter "spec/support"
 
-  # The GTK / UI / X11 layer needs a real display and is verified by the smoke
-  # test plus visual inspection, not RSpec (see AGENTS.md). It isn't loaded by
-  # these specs, but filter it explicitly so the report can't be skewed by it.
-  add_filter "lib/app.rb"
-  add_filter "lib/sync.rb"
+  # The GTK widget / Xlib layer needs a real display and meaningful assertions
+  # against rendered output, so it's verified by the smoke test plus visual
+  # inspection, not RSpec (see AGENTS.md). app.rb and sync.rb ARE covered (the
+  # orchestration logic, with the widgets stubbed), so they're not filtered.
   add_filter "lib/ui"
   add_filter "lib/x11"
 

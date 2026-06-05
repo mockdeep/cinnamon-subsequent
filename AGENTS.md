@@ -38,17 +38,30 @@ For visual checks, launch with `nohup … &`, inspect, then kill. Useful tools:
 ### Automated tests
 
 ```
-bundle exec rspec    # the spec suite
-bundle exec rake     # spec + rubocop (the default task)
+bundle exec rspec               # the spec suite (needs a display — see below)
+bundle exec rake                # spec + rubocop (the default task)
+xvfb-run -a bundle exec rake    # headless (what CI runs)
 ```
 
-RSpec covers the **pure, non-GTK core only** — `lib/config.rb`,
-`lib/trello_client.rb`, `lib/board_fetch.rb` — at 100% line + branch coverage
-(SimpleCov reports it; there is **no** coverage gate). The GTK/UI/X11 layer
-(`app.rb`, `sync.rb`, `lib/ui/*`, `lib/x11/*`) is deliberately **not**
-unit-tested: it needs a real display, so it's verified by the smoke test plus
-visual inspection instead. `spec/support/coverage.rb` filters that layer out of
-the report. Trello calls are stubbed with WebMock (no real network in specs).
+RSpec covers the **logic layers** at 100% line + branch coverage (SimpleCov
+reports it; there is **no** coverage gate):
+
+- `config.rb`, `trello_client.rb`, `board_fetch.rb` — pure, no GTK. Trello calls
+  are stubbed with WebMock (no real network in specs).
+- `sync.rb` — drives a real `GLib::MainLoop` headlessly (GLib needs no display).
+- `app.rb` — the orchestration cascade, with the UI/Trello collaborators
+  injected as doubles. `App.new` takes `header:`/`window:`/`client:` keyword
+  args for exactly this; `Sync.run` is stubbed to run inline.
+
+Only the **GTK widget / Xlib rendering layer** (`lib/ui/*`, `lib/x11/*`) is left
+to the smoke test + visual inspection; `spec/support/coverage.rb` filters it out
+of the report.
+
+**`app_spec.rb` needs a display.** It `require "app"`, which loads the `ui/*`
+widget classes, and *defining* a `Gtk::*` subclass calls `Gtk.init` — that fails
+with no display. So the full suite must run under an X server: locally you have
+one; CI wraps `rake` in `xvfb-run`. The other specs (`config`/`trello`/`board_fetch`/`sync`)
+stay headless, so running them individually never needs a display.
 
 RuboCop uses a strict `EnabledByDefault: true` config; pre-existing offenses are
 shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
