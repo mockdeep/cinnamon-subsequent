@@ -43,25 +43,33 @@ bundle exec rake                # spec + rubocop (the default task)
 xvfb-run -a bundle exec rake    # headless (what CI runs)
 ```
 
-RSpec covers the **logic layers** at 100% line + branch coverage (SimpleCov
-reports it; there is **no** coverage gate):
+RSpec covers **all of `lib/`** at 100% line + branch coverage (SimpleCov reports
+it; there is **no** coverage gate):
 
 - `config.rb`, `trello_client.rb`, `board_fetch.rb` — pure, no GTK. Trello calls
   are stubbed with WebMock (no real network in specs).
 - `sync.rb` — drives a real `GLib::MainLoop` headlessly (GLib needs no display).
-- `app.rb` — the orchestration cascade, with the UI/Trello collaborators
-  injected as doubles. `App.new` takes `header:`/`window:`/`client:` keyword
-  args for exactly this; `Sync.run` is stubbed to run inline.
+- `app.rb` — the orchestration cascade. Only the UI boundary is doubled
+  (`header:`/`window:` — `App.new` takes these keyword args for exactly this);
+  `Config`, `TrelloClient` (over WebMock), and `BoardFetch` run for real, and
+  `Sync.run` is stubbed to run inline.
+- `lib/ui/*` — real widgets under a display. Tests assert on the **public widget
+  tree** (`row.children.grep(Gtk::Label)`, `dropdown.popover.child.child.child`)
+  and getters (`style_context.has_class?`, `visible?`, `label.label`). User
+  actions are simulated by driving the widgets (`checkbox.active = true`,
+  `listbox.signal_emit("row-activated", row)`, `button.clicked`). Some specs need
+  `widget.show_all` first or visibility/stack-switching won't read back.
+- `lib/x11/strut.rb` — the Xlib FFI `Lib` module is stubbed (`stub_const`), so
+  the spec asserts the strut **arrays/atoms** without a real X server.
+- `dock_window.rb` — `relayout`/`apply_dock_behaviour` (real Xlib: XID, struts,
+  keep-below) are tested with `relayout`/`X11::Strut`/`geometry` stubbed; the
+  HiDPI scale math in `relayout` is asserted against fake monitor geometry.
 
-Only the **GTK widget / Xlib rendering layer** (`lib/ui/*`, `lib/x11/*`) is left
-to the smoke test + visual inspection; `spec/support/coverage.rb` filters it out
-of the report.
-
-**`app_spec.rb` needs a display.** It `require "app"`, which loads the `ui/*`
-widget classes, and *defining* a `Gtk::*` subclass calls `Gtk.init` — that fails
-with no display. So the full suite must run under an X server: locally you have
-one; CI wraps `rake` in `xvfb-run`. The other specs (`config`/`trello`/`board_fetch`/`sync`)
-stay headless, so running them individually never needs a display.
+**The full suite needs a display.** Requiring any `ui/*` file (or `app`, which
+pulls them in) *defines* a `Gtk::*` subclass, which calls `Gtk.init` and fails
+with no display. So locally you rely on your X server; CI wraps `rake` in
+`xvfb-run`. Only `config`/`trello`/`board_fetch`/`sync`/`strut` specs are
+display-free, so those files can be run individually headless.
 
 RuboCop uses a strict `EnabledByDefault: true` config; pre-existing offenses are
 shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
