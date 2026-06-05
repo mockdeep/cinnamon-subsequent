@@ -11,7 +11,14 @@ require "bundler/setup"
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 require "config"
+require "pid_file"
 require "app"
+
+# Record this instance so `rake sidebar:*` can find it; clear on a clean exit
+# (window close). A SIGTERM/kill leaves the file behind, but PidFile.running_pid
+# treats a dead/reused pid as "not running" and clears it, so it self-heals.
+PidFile.write
+at_exit { PidFile.clear }
 
 App.new(Config.load).start
 Gtk.main

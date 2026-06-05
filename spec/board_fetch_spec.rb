@@ -141,6 +141,11 @@ RSpec.describe BoardFetch do
             "name" => "Untagged list",
             "checkItems" => [api_item("id" => "i5", "name" => "Loose")],
           ),
+          api_checklist(
+            "id" => "cl-5",
+            "name" => "Archived @archived",
+            "checkItems" => [api_item("id" => "i6", "state" => "complete")],
+          ),
         ],
       )
     end
@@ -154,6 +159,10 @@ RSpec.describe BoardFetch do
 
     it "ignores checklists with no @tag in their name" do
       expect(lane_view.tags.map(&:name)).not_to include("Untagged list")
+    end
+
+    it "omits a tag whose only checklist has no incomplete items" do
+      expect(lane_view.tags.map(&:name)).not_to include("@archived")
     end
 
     it "gathers a tag's incomplete items from every matching checklist" do
