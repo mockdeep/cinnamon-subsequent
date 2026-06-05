@@ -9,7 +9,9 @@ A persistent Trello to-do **sidebar** for Linux Mint / Cinnamon: a borderless
 GTK3 window pinned to the right screen edge that reserves its space (maximized
 windows stop at it), shows on all workspaces, never takes focus, and renders the
 checklists of the first card in a chosen board+lane. Click an item to complete
-it (pushed to Trello immediately). Single process, Ruby + GTK3.
+it (pushed to Trello immediately). A tag bar under the menu filters across all
+cards in the lane by `@tag` (parsed from checklist names). Single process,
+Ruby + GTK3.
 
 ## Running & verifying
 
@@ -96,6 +98,12 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
 - **The window is permanently in CSS `:backdrop` state** — it never takes focus
   (`accept_focus = false`). When writing CSS, remember normal/`:hover` states may
   behave unexpectedly; the widget path shows `window:backdrop`.
+- **`no_show_all` makes `show_all` a no-op on the widget itself.** `UI::TagBar`
+  sets `no_show_all = true` so the parent's startup `show_all` doesn't reveal the
+  empty bar — but that same flag blocks `show_all` *on the bar*, so chips are
+  shown individually (`children.last.show_all` per chip) and the bar is toggled
+  with `set_visible`, never `show_all`. The `makes the chips visible, not just
+  present` spec pins it (label-only assertions missed it).
 - **Dropdowns are Popovers, not ComboBoxes** (`lib/ui/dropdown.rb`). Combo menus
   fly off-screen to the left when the window is flush against the right edge, and
   their minimum width forced the window wider than 320px. Do **not** "simplify"
@@ -148,14 +156,25 @@ leave the dropdowns permanently empty even after reconnecting. The persisted
 `board_id`/`lane_id` keep the current selection across the reload. Cost: every
 refresh is the full 3-call cascade, not one card fetch.
 
+**Tags span the whole lane; the leaf view doesn't.** The lane fetch is a single
+`TrelloClient#cards_with_checklists` request — cards + checklists + check-items
+nested, no per-card fan-out. `BoardFetch` derives two things from that one
+payload: the default leaf view (still **first-card-only**) and a lane-wide tag
+index (`@words` in checklist names → incomplete items across **every card**),
+both carried on the returned `LaneView`. Toggling tag chips filters in memory via
+`LaneView#result_for` — no refetch. The selected-tag set lives on `App`: it
+**persists across Refresh** (reconciled against the lane's current tags, vanished
+ones dropped) and **resets on a board/lane switch** (a different tag set).
+
 ## Architecture map
 
 - `bin/todo-sidebar` — entry point.
 - `lib/app.rb` — orchestrator: drives the board → lane → fetch cascade, all async.
 - `lib/config.rb` — config file load/save.
 - `lib/trello_client.rb` — Trello REST (stdlib net/http).
-- `lib/board_fetch.rb` — builds the view model (the structs the UI renders).
+- `lib/board_fetch.rb` — builds the view model (the structs the UI renders) and
+  the lane-wide tag index (`LaneView`, with in-memory `result_for` filtering).
 - `lib/sync.rb` — worker-thread + main-thread marshalling helper.
 - `lib/x11/strut.rb` — the Xlib strut call.
 - `lib/ui/` — `dock_window` (window + strut + CSS), `header`, `dropdown`,
-  `checklist_view`, `item_row`.
+  `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`.

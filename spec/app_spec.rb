@@ -55,7 +55,15 @@ RSpec.describe App do
   end
 
   def cards_url(lane_id)
-    api_url("/lists/#{lane_id}/cards", fields: "name", filter: "open")
+    api_url(
+      "/lists/#{lane_id}/cards",
+      fields: "name",
+      filter: "open",
+      checklists: "all",
+      checklist_fields: "name,pos",
+      checkItems: "all",
+      checkItem_fields: "name,state,pos",
+    )
   end
 
   def stub_cards(lane_id, cards)
@@ -70,6 +78,8 @@ RSpec.describe App do
     allow(header).to receive(:set_lanes)
     allow(header).to receive(:busy=)
     allow(window).to receive(:on_item_toggle) { |&block| callbacks[:toggle] = block }
+    allow(window).to receive(:on_tag_change) { |&block| callbacks[:tag] = block }
+    allow(window).to receive(:set_tags)
     allow(window).to receive(:show_all)
     allow(window).to receive(:apply_dock_behaviour)
     allow(window).to receive(:render)
@@ -306,6 +316,80 @@ RSpec.describe App do
       callbacks[:toggle].call(row, item, "complete")
 
       expect(row).to have_received(:fail).with(instance_of(TrelloClient::Error))
+    end
+  end
+
+  describe "tag filtering" do
+    # Capture what the window is told to render / which tags it's given, so we
+    # can assert on the *latest* state after a sequence of interactions.
+    let(:renders) { [] }
+    let(:tag_updates) { [] }
+
+    def tagged_card(id: "c1")
+      checklists = [
+        api_checklist(
+          "id" => "cl1",
+          "name" => "Home @home",
+          "checkItems" => [api_item("id" => "i1", "name" => "Milk")],
+        ),
+        api_checklist(
+          "id" => "cl2",
+          "name" => "Work @work",
+          "checkItems" => [api_item("id" => "i2", "name" => "Email")],
+        ),
+      ]
+      api_card("id" => id, "name" => "Card", "checklists" => checklists)
+    end
+
+    before do
+      allow(window).to receive(:render) { |result| renders << result }
+      allow(window).to receive(:set_tags) { |tags, selected| tag_updates << [tags, selected] }
+      stub_boards([api_board("id" => "b1")])
+      stub_lists("b1", [api_list("id" => "l1")])
+      stub_request(:get, cards_url("l1")).to_return(body: [tagged_card].to_json)
+      app.start
+    end
+
+    it "populates the tag bar from the whole lane, unselected" do
+      tags, selected = tag_updates.last
+
+      expect(tags.map(&:name)).to eq(["@home", "@work"])
+      expect(selected).to eq(Set.new)
+    end
+
+    it "renders the default first-card view before any tag is chosen" do
+      expect(renders.last.groups.map(&:name)).to eq(["Home @home", "Work @work"])
+    end
+
+    it "renders matching items under a tag heading when a tag is selected" do
+      callbacks[:tag].call(Set["@home"])
+
+      expect(renders.last.groups.map(&:name)).to eq(["@home"])
+      expect(renders.last.groups.first.items.map(&:name)).to eq(["Milk"])
+    end
+
+    it "returns to the default view when the selection is cleared" do
+      callbacks[:tag].call(Set["@home"])
+      callbacks[:tag].call(Set.new)
+
+      expect(renders.last.groups.map(&:name)).to eq(["Home @home", "Work @work"])
+    end
+
+    it "keeps the tag filter across a refresh" do
+      callbacks[:tag].call(Set["@home"])
+      callbacks[:refresh].call
+
+      expect(tag_updates.last.last).to eq(Set["@home"])
+      expect(renders.last.groups.map(&:name)).to eq(["@home"])
+    end
+
+    it "resets the tag filter when switching lane" do
+      callbacks[:tag].call(Set["@home"])
+      stub_request(:get, cards_url("l2")).to_return(body: [tagged_card].to_json)
+      callbacks[:lane].call("l2")
+
+      expect(tag_updates.last.last).to eq(Set.new)
+      expect(renders.last.groups.map(&:name)).to eq(["Home @home", "Work @work"])
     end
   end
 end
