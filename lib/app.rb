@@ -11,8 +11,6 @@ require "ui/dock_window"
 # Every network call runs on a worker thread (via Sync) and renders its result
 # back on the main thread; the header shows a busy spinner meanwhile.
 class App
-  # Collaborators default to the real UI/Trello objects; they're injectable so
-  # the orchestration can be driven with test doubles without a display.
   def initialize(config, header: UI::Header.new, window: nil, client: nil)
     @config = config
     @header = header
