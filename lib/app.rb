@@ -11,12 +11,13 @@ require "ui/dock_window"
 # Every network call runs on a worker thread (via Sync) and renders its result
 # back on the main thread; the header shows a busy spinner meanwhile.
 class App
-  def initialize(config)
+  # Collaborators default to the real UI/Trello objects; they're injectable so
+  # the orchestration can be driven with test doubles without a display.
+  def initialize(config, header: UI::Header.new, window: nil, client: nil)
     @config = config
-    @client = config.configured? &&
-              TrelloClient.new(key: config.trello_key, token: config.trello_token)
-    @header = UI::Header.new
-    @window = UI::DockWindow.new(edge: config.edge, width: config.width, header: @header)
+    @header = header
+    @window = window || build_window
+    @client = client || build_client
     wire_callbacks
   end
 
@@ -33,6 +34,16 @@ class App
   end
 
   private
+
+  def build_window
+    UI::DockWindow.new(edge: @config.edge, width: @config.width, header: @header)
+  end
+
+  def build_client
+    return false unless @config.configured?
+
+    TrelloClient.new(key: @config.trello_key, token: @config.trello_token)
+  end
 
   def wire_callbacks
     @header.on_board_change { |board_id| select_board(board_id) }

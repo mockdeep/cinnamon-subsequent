@@ -14,17 +14,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    # The gtk3 gem builds native extensions against the GTK3 dev headers, so
-    # they must be present before bundler-cache runs `bundle install`.
-    - name: Install GTK3 dev headers
-      run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+    # libgtk-3-dev: the gtk3 gem builds native extensions against it, so it must
+    # be present before bundler-cache runs `bundle install`. xvfb: the App spec
+    # loads GTK widget classes (Gtk.init), which needs a display.
+    - name: Install GTK3 dev headers and a virtual display
+      run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev xvfb
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: '4.0'
         bundler-cache: true
     - name: Run the default task
-      run: bundle exec rake
+      run: xvfb-run -a bundle exec rake
     - uses: actions/upload-artifact@v4
       with:
         name: coverage
