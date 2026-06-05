@@ -21,6 +21,10 @@ RSpec.describe X11::Strut do
     stub_const("#{described_class}::Lib", lib_double)
   end
 
+  # Drop the display memoized against the stubbed Lib so a real Xlib call in
+  # another spec re-opens a real one.
+  after { described_class.instance_variable_set(:@display, nil) }
+
   def change_for(prop_name)
     lib_double.calls.find { |args| args[2] == prop_name }
   end
