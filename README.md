@@ -13,6 +13,10 @@ Trello. It pins a full-height column to the right edge of the screen that:
   only **incomplete** items;
 - lets you **click an item to complete it** (pushed to Trello immediately, with a
   spinner while it's in flight and undo by clicking again);
+- lets you **filter by `@tag`** — a wrapping row of tag chips sits under the menu
+  (a tag is any `@word` in a checklist's name); click chips to show matching
+  incomplete items from **every card in the lane**, each selected tag under its
+  own heading. With nothing selected you get the normal first-card view.
 - has **Board** and **Lane** dropdowns and a **Refresh** button up top (Refresh
   reloads everything — boards, lanes, and the card).
 
@@ -90,6 +94,9 @@ rm ~/.config/autostart/cinnamon-subsequent.desktop
 - The sidebar reads the **first card** of the selected lane; its checklists become
   the list. Completed items stay visible (struck-through, undoable) until the next
   **Refresh**.
+- **Tags are lane-scoped.** The chips come from `@words` in checklist names across
+  every card in the current lane; the bar hides itself when a lane has no `@tags`.
+  The selection survives a Refresh but resets when you switch board or lane.
 - **Refresh** reloads the whole cascade — boards, lanes, and the card (refetching
   incomplete-only) — while keeping your current selection. This is also the
   recovery path when the sidebar starts with **no network**: it shows an error and

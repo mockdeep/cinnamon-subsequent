@@ -16,6 +16,8 @@ class App
     @header = header
     @window = window || build_window
     @client = client || build_client
+    @lane_view = nil
+    @selected_tags = Set.new
     wire_callbacks
   end
 
@@ -48,6 +50,7 @@ class App
     @header.on_lane_change  { |lane_id| select_lane(lane_id) }
     @header.on_refresh      { refresh_view }
     @window.on_item_toggle  { |row, item, desired| toggle_item(row, item, desired) }
+    @window.on_tag_change   { |selected| select_tags(selected) }
   end
 
   # Push a single item's new state to Trello; the row shows a spinner until
@@ -76,8 +79,10 @@ class App
              on_error: method(:show_error))
   end
 
-  # User picked a different board → reset to its first lane.
+  # User picked a different board → reset to its first lane. Its tags are a
+  # different set, so the tag selection starts clean.
   def select_board(board_id)
+    @selected_tags = Set.new
     load_lanes(board_id, prefer_lane: nil)
   end
 
@@ -98,15 +103,25 @@ class App
              on_error: method(:show_error))
   end
 
+  # Switching lane brings up a different set of tags, so reset the selection.
   def select_lane(lane_id)
+    @selected_tags = Set.new
     persist(@config.board_id, lane_id)
     fetch_and_render
+  end
+
+  # User toggled tag chips: re-render from the held lane view, no refetch.
+  def select_tags(selected)
+    @selected_tags = selected.to_set
+    @window.render(@lane_view.result_for(@selected_tags)) if @lane_view
   end
 
   # Reload the whole cascade (boards → lanes → cards) so the dropdowns
   # repopulate too — not just the leaf checklist. This also recovers a cold
   # start that failed offline, where boards/lanes never loaded. The persisted
-  # board_id/lane_id keep the current selection.
+  # board_id/lane_id keep the current selection. Unlike a board/lane switch,
+  # refresh leaves @selected_tags intact, so the active tag filter survives
+  # (finish_lane drops only tags that no longer exist).
   def refresh_view
     load_boards if @client
   end
@@ -115,7 +130,7 @@ class App
     @window.render_loading
     busy(true)
     Sync.run(-> { BoardFetch.new(@client, @config).call },
-             on_success: ->(result) { finish(result) },
+             on_success: ->(lane_view) { finish_lane(lane_view) },
              on_error: method(:show_error))
   end
 
@@ -125,7 +140,23 @@ class App
     @config.save
   end
 
+  # A freshly fetched lane: populate the tag bar and render. The selection is
+  # reconciled against the lane's actual tags — a refresh keeps every selection
+  # that still exists; a reset (board/lane switch) has already emptied it.
+  def finish_lane(lane_view)
+    @lane_view = lane_view
+    @selected_tags &= lane_view.tags.to_set(&:name)
+    @window.set_tags(lane_view.tags, @selected_tags)
+    @window.render(lane_view.result_for(@selected_tags))
+    busy(false)
+  end
+
+  # An empty/error state from the cascade (no boards, no lanes, Trello error):
+  # no lane view, so clear any tags and render the plain message.
   def finish(result)
+    @lane_view = nil
+    @selected_tags = Set.new
+    @window.set_tags([], @selected_tags)
     @window.render(result)
     busy(false)
   end

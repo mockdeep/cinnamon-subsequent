@@ -9,6 +9,7 @@ RSpec.describe UI::DockWindow do
   def stack = dock.child
   def strip_count = dock.instance_variable_get(:@strip_count).label
   def checklist_view = dock.instance_variable_get(:@checklist_view)
+  def tag_bar = dock.instance_variable_get(:@tag_bar)
 
   describe "#render" do
     it "shows the remaining-item count on the collapsed strip" do
@@ -38,6 +39,28 @@ RSpec.describe UI::DockWindow do
       row.children.grep(Gtk::CheckButton).first.active = true
 
       expect(captured).to eq([row, row.item, "complete"])
+    end
+  end
+
+  describe "#set_tags / #on_tag_change" do
+    def tag(name, count) = BoardFetch::Tag.new(name: name, item_count: count)
+
+    it "forwards tags to the tag bar" do
+      dock.set_tags([tag("@home", 1)], Set.new)
+
+      labels = tag_bar.children.map { |c| c.children.first.label }
+      expect(labels).to eq(["@home (1)"])
+    end
+
+    it "relays a chip toggle to the on_tag_change handler" do
+      captured = nil
+      dock.on_tag_change { |selected| captured = selected }
+      dock.set_tags([tag("@home", 1)], Set.new)
+      dock.show_all
+
+      tag_bar.children.first.children.first.active = true
+
+      expect(captured).to eq(Set["@home"])
     end
   end
 

@@ -3,6 +3,7 @@
 require "gtk3"
 require "x11/strut"
 require "ui/checklist_view"
+require "ui/tag_bar"
 
 module UI
   # A borderless, full-height window pinned to a screen edge that reserves its
@@ -68,6 +69,16 @@ module UI
     # Called when a row is clicked: block receives (row, item, desired_state).
     def on_item_toggle(&block)
       @on_item_toggle = block
+    end
+
+    # Called when the tag selection changes: block receives the selected Set.
+    def on_tag_change(&block)
+      @on_tag_change = block
+    end
+
+    # Repopulate the tag bar; `selected` is the set of tag names to start pressed.
+    def set_tags(tags, selected)
+      @tag_bar.set_tags(tags, selected)
     end
 
     # Replace the displayed checklists with a freshly fetched view model.
@@ -143,6 +154,8 @@ module UI
       expanded = Gtk::Box.new(:vertical, 0)
       expanded.style_context.add_class("sidebar")
       expanded.pack_start(@header, expand: false, fill: false, padding: 0)
+      @tag_bar = TagBar.new { |selected| @on_tag_change&.call(selected) }
+      expanded.pack_start(@tag_bar, expand: false, fill: false, padding: 0)
       @checklist_view = ChecklistView.new
       expanded.pack_start(@checklist_view, expand: true, fill: true, padding: 0)
 
@@ -216,6 +229,28 @@ module UI
         .topbar button.refresh:hover,
         .topbar button.collapse:hover { background-color: #333b4d; }
         .topbar .dropdown .caret { color: #9aa3b2; }
+
+        /* Tag bar: wrapping row of toggle chips under the header. The flowbox
+           and its child wrappers stay transparent (selection_mode is :none, so
+           the chips carry all the visible state). */
+        .tag-bar { background-color: #181c25; border-bottom: 1px solid #3a4150; padding: 4px 6px; }
+        .tag-bar, .tag-bar flowboxchild { background-color: transparent; border: none; padding: 0; min-width: 0; min-height: 0; }
+        .tag-bar flowboxchild:selected { background-color: transparent; }
+        .tag-chip {
+          background-image: none;
+          background-color: #2a3140;
+          color: #cdd6e6;
+          border: 1px solid #3a4150;
+          box-shadow: none;
+          text-shadow: none;
+          border-radius: 10px;
+          padding: 0 8px;
+          margin: 2px;
+          min-height: 0;
+          font-size: 11px;
+        }
+        .tag-chip:hover { background-color: #333b4d; }
+        .tag-chip:checked { background-color: #34507e; color: #ffffff; border-color: #4a6aa5; }
 
         /* Collapsed strip */
         .strip { background-color: #181c25; background-image: none; border: none; border-radius: 0; box-shadow: none; padding: 0; outline: none; }

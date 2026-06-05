@@ -38,6 +38,24 @@ RSpec.describe TrelloClient do
     end
   end
 
+  describe "#cards_with_checklists" do
+    it "returns the open cards with their checklists and items nested" do
+      url = api_url(
+        "/lists/l1/cards",
+        fields: "name",
+        filter: "open",
+        checklists: "all",
+        checklist_fields: "name,pos",
+        checkItems: "all",
+        checkItem_fields: "name,state,pos",
+      )
+      card = api_card("checklists" => [api_checklist("checkItems" => [api_item])])
+      stub_request(:get, url).to_return(body: [card].to_json)
+
+      expect(client.cards_with_checklists("l1")).to eq([card])
+    end
+  end
+
   describe "#checklists" do
     it "returns the checklists for a card with their items" do
       url = api_url(

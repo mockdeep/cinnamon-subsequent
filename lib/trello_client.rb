@@ -32,6 +32,20 @@ class TrelloClient
     get("/lists/#{list_id}/cards", fields: "name", filter: "open")
   end
 
+  # Open cards in a list, each with its checklists and their check-items nested,
+  # in a single request - so tag filtering can span every card in the lane
+  # without a per-card fan-out:
+  #   [{id, name, checklists: [{id, name, pos, checkItems: [...]}, ...]}, ...]
+  def cards_with_checklists(list_id)
+    get("/lists/#{list_id}/cards",
+        fields: "name",
+        filter: "open",
+        checklists: "all",
+        checklist_fields: "name,pos",
+        checkItems: "all",
+        checkItem_fields: "name,state,pos")
+  end
+
   # Checklists on a card, each with its check-items and their state:
   # [{id, name, checkItems: [{id, name, state, pos}, ...]}, ...]
   def checklists(card_id)
