@@ -95,5 +95,14 @@ RSpec.describe UI::TagBar do
       expect(bar.selected).to eq(Set.new)
       expect(changes.last).to eq(Set.new)
     end
+
+    it "ignores a toggle when built without an on_change block" do
+      plain = described_class.new
+      plain.show_all
+      plain.set_tags([tag("@home", 2)], Set.new)
+
+      expect { plain.children.first.children.first.active = true }
+        .not_to raise_error
+    end
   end
 end

@@ -87,6 +87,21 @@ with:
 rm ~/.config/autostart/cinnamon-subsequent.desktop
 ```
 
+## Development
+
+Rake tasks cycle a detached instance — handy after a code change:
+
+```
+bundle exec rake sidebar:start     # launch detached
+bundle exec rake sidebar:restart   # stop + relaunch with current code
+bundle exec rake sidebar:stop      # stop it
+bundle exec rake sidebar:status    # is it running?
+```
+
+They track the instance through a pidfile the app writes on boot, so they also
+find one started at login. Run the test suite with `bundle exec rake` (or
+`xvfb-run -a bundle exec rake` headless — the UI specs need a display).
+
 ## Notes
 
 - **HiDPI:** the strut is scaled by the monitor's `scale_factor`, so the reserved

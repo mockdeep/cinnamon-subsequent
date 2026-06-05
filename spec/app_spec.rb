@@ -392,4 +392,13 @@ RSpec.describe App do
       expect(renders.last.groups.map(&:name)).to eq(["Home @home", "Work @work"])
     end
   end
+
+  describe "toggling tags before a lane has loaded" do
+    it "is a safe no-op, with nothing to re-render yet" do
+      app
+      callbacks[:tag].call(Set["@home"])
+
+      expect(window).not_to have_received(:render)
+    end
+  end
 end

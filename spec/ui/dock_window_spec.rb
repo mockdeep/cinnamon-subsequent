@@ -62,6 +62,14 @@ RSpec.describe UI::DockWindow do
 
       expect(captured).to eq(Set["@home"])
     end
+
+    it "is a safe no-op to toggle a chip when no handler is wired" do
+      dock.set_tags([tag("@home", 1)], Set.new)
+      dock.show_all
+
+      expect { tag_bar.children.first.children.first.active = true }
+        .not_to raise_error
+    end
   end
 
   describe "#render_loading" do

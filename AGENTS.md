@@ -22,20 +22,47 @@ Build deps: the `gtk3` gem builds native extensions and needs **`libgtk-3-dev`**
 (`sudo apt install libgtk-3-dev`); the rest of the chain is already present.
 Ruby is mise-managed — always run via `bundle exec`.
 
+**Prefer the `rake sidebar:*` tasks** to run and cycle an instance — for a visual
+check, `rake sidebar:start`, inspect, then `rake sidebar:stop`:
+
 ```
-bundle exec ruby bin/todo-sidebar          # run it
-DISPLAY=:0 timeout 6 bundle exec ruby bin/todo-sidebar   # smoke test: exit 124 = booted clean
+bundle exec rake sidebar:start      # launch detached (survives the shell)
+bundle exec rake sidebar:restart    # stop + relaunch with current code
+bundle exec rake sidebar:stop       # stop it
+bundle exec rake sidebar:status     # running pid, or "not running"
 ```
 
-For visual checks, launch with `nohup … &`, inspect, then kill. Useful tools:
+The tasks (thin wrappers in the `Rakefile` over the testable
+`lib/sidebar_control.rb`) launch via `setsid` (so it outlives the rake process)
+and locate the instance via the **pidfile** the app writes on boot
+(`lib/pid_file.rb`), so it works for an autostart-launched instance too. The
+recorded pid is trusted only after a liveness + identity check (`Process.kill(0,
+…)` plus one `/proc/<pid>/cmdline` read confirming it's still our launcher), so a
+stale or reused pid reads as "not running" and self-heals.
+
+For a one-off boot check without the task machinery, run it in the foreground:
+
+```
+DISPLAY=:0 timeout 6 bundle exec ruby bin/todo-sidebar   # exit 124 = booted clean
+```
+
+**Caveat:** every launch (incl. this foreground smoke test) writes the pidfile,
+so running a bare launch *alongside* a `rake`-managed instance desyncs the file —
+`status` can then misreport and `start` can spawn a duplicate. Stick to the rake
+tasks for a managed instance; use the foreground run only when none is managed.
+
+Useful tools for visual checks:
 
 - `xwininfo -name cinnamon-subsequent` — window geometry.
 - **Screenshot + pixel-sample** to diagnose rendering (how the right-edge line
   was found): `import -window root -crop WxH+X+Y out.png`, then
   `convert out.png -format '%[pixel:p{0,0}]' info:-`.
-- **Killing instances:** do NOT `pkill -f bin/todo-sidebar` — that pattern
-  matches your own shell command line and kills the command itself. Instead
-  iterate `pgrep -x ruby` and check `/proc/$pid/cmdline`, or use a saved PID.
+- **Killing instances:** prefer `rake sidebar:stop` (reads the pidfile). If doing
+  it by hand, do NOT `pkill -f bin/todo-sidebar` — that pattern substring-matches
+  your own shell command line and kills the command itself. Match the launcher as
+  a whole argv element instead: iterate `pgrep -x ruby` and check
+  `/proc/$pid/cmdline`, or use a saved PID. (`PidFile.ours?` is the precise
+  version: it splits `/proc/<pid>/cmdline` on NUL and checks `end_with?`.)
 
 ### Automated tests
 
@@ -48,8 +75,11 @@ xvfb-run -a bundle exec rake    # headless (what CI runs)
 RSpec covers **all of `lib/`** at 100% line + branch coverage (SimpleCov reports
 it; there is **no** coverage gate):
 
-- `config.rb`, `trello_client.rb`, `board_fetch.rb` — pure, no GTK. Trello calls
-  are stubbed with WebMock (no real network in specs).
+- `config.rb`, `trello_client.rb`, `board_fetch.rb`, `pid_file.rb`,
+  `sidebar_control.rb` — pure, no GTK. Trello calls are stubbed with WebMock (no
+  real network in specs); `pid_file` points at a tmpdir via `XDG_RUNTIME_DIR` and
+  stubs `/proc` reads; `sidebar_control` stubs `Process`/`PidFile` and captures
+  stdout (no process is actually spawned).
 - `sync.rb` — drives a real `GLib::MainLoop` headlessly (GLib needs no display).
 - `app.rb` — the orchestration cascade. Only the UI boundary is doubled
   (`header:`/`window:` — `App.new` takes these keyword args for exactly this);
@@ -73,8 +103,9 @@ it; there is **no** coverage gate):
 **The full suite needs a display.** Requiring any `ui/*` file (or `app`, which
 pulls them in) *defines* a `Gtk::*` subclass, which calls `Gtk.init` and fails
 with no display. So locally you rely on your X server; CI wraps `rake` in
-`xvfb-run`. Only `config`/`trello`/`board_fetch`/`sync`/`strut` specs are
-display-free, so those files can be run individually headless.
+`xvfb-run`. Only `config`/`trello`/`board_fetch`/`pid_file`/`sidebar_control`/
+`sync`/`strut` specs are display-free, so those files can be run individually
+headless.
 
 RuboCop uses a strict `EnabledByDefault: true` config; pre-existing offenses are
 shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
@@ -135,6 +166,9 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
 
 - **Trello credentials + selected board/lane:** `~/.config/cinnamon-subsequent/config.json`
   (`0600`). Never in the repo.
+- **Pidfile:** `$XDG_RUNTIME_DIR/cinnamon-subsequent.pid` (falls back to the
+  config dir). Written by the app on boot, read by the `sidebar:*` rake tasks
+  (`lib/pid_file.rb`). Not authoritative — always liveness/identity-checked.
 - No on-disk task cache: a deliberate choice — show a fresh loader rather than a
   potentially stale list. Offline isn't handled by caching but by **refresh
   recovery** (see "The Trello model" below): a start with no network leaves empty
@@ -168,9 +202,11 @@ ones dropped) and **resets on a board/lane switch** (a different tag set).
 
 ## Architecture map
 
-- `bin/todo-sidebar` — entry point.
+- `bin/todo-sidebar` — entry point (also writes/clears the pidfile).
 - `lib/app.rb` — orchestrator: drives the board → lane → fetch cascade, all async.
 - `lib/config.rb` — config file load/save.
+- `lib/pid_file.rb` — pidfile the app records and `rake sidebar:*` reads.
+- `lib/sidebar_control.rb` — start/stop/restart logic behind the `sidebar:*` tasks.
 - `lib/trello_client.rb` — Trello REST (stdlib net/http).
 - `lib/board_fetch.rb` — builds the view model (the structs the UI renders) and
   the lane-wide tag index (`LaneView`, with in-memory `result_for` filtering).

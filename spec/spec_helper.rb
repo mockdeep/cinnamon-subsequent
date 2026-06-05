@@ -9,10 +9,13 @@ $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 require "config"
 require "trello_client"
 require "board_fetch"
+require "pid_file"
+require "sidebar_control"
 require "sync"
 # NOTE: lib/app.rb (and the ui/* widgets it pulls in) is required by app_spec,
 # not here — loading a Gtk widget class calls Gtk.init, so it needs a display.
 
+require_relative "support/env"
 require_relative "support/factories"
 require_relative "support/trello"
 require_relative "support/webmock"
