@@ -22,6 +22,12 @@ RSpec.describe UI::ItemRow do
         .to eq('see (<a href="http://x.com/a&amp;b">link</a>)')
     end
 
+    it "leaves http lookalikes without a real scheme as plain text" do
+      row = described_class.new(make_item(name: "httpd config http:nope"))
+
+      expect(label(row).label).to eq("httpd config http:nope")
+    end
+
     it "strikes through the label when the item is complete" do
       row = described_class.new(make_item(name: "done", state: "complete"))
 

@@ -46,6 +46,44 @@ RSpec.describe UI::ChecklistView do
       expect(rows.map(&:class)).to eq([Gtk::Label])
     end
 
+    it "leaves the header a bare label when the group has no links" do
+      view.render(make_result(groups: [make_group(name: "List A")]))
+
+      expect(rows.first).to be_a(Gtk::Label)
+      expect(rows.first.label).to eq("List A")
+    end
+
+    it "adds an 'Open links (N)' button counting every URL occurrence" do
+      group = make_group(
+        items: [
+          make_item(name: "see http://a.test and http://b.test"),
+          make_item(id: "i2", name: "also http://a.test"),
+        ],
+      )
+
+      view.render(make_result(groups: [group]))
+
+      expect(rows.first).to be_a(Gtk::Box)
+      button = rows.first.children.grep(Gtk::Button).first
+      expect(button.label).to eq("Open links (3)")
+    end
+
+    it "launches every URL in document order when the button is clicked" do
+      opened = []
+      allow(Gio::AppInfo).to receive(:launch_default_for_uri) { |uri, _| opened << uri }
+      group = make_group(
+        items: [
+          make_item(name: "see http://a.test and http://b.test"),
+          make_item(id: "i2", name: "also http://a.test"),
+        ],
+      )
+
+      view.render(make_result(groups: [group]))
+      rows.first.children.grep(Gtk::Button).first.clicked
+
+      expect(opened).to eq(["http://a.test", "http://b.test", "http://a.test"])
+    end
+
     it "wires on_toggle through to its item rows" do
       captured = nil
       view.render(

@@ -198,6 +198,20 @@ module UI
         .sidebar  { background-color: #1f2430; color: #e6e6e6; font-size: 13px; }
         .topbar   { background-color: #181c25; border-bottom: 1px solid #3a4150; }
         .checklist-header { color: #8fb3ff; font-size: 11px; font-weight: bold; margin-top: 6px; margin-bottom: 2px; }
+        .open-links {
+          background-image: none;
+          background-color: #2a3140;
+          color: #cdd6e6;
+          border: 1px solid #3a4150;
+          box-shadow: none;
+          text-shadow: none;
+          border-radius: 6px;
+          padding: 0 8px;
+          min-height: 0;
+          min-width: 0;
+          font-size: 11px;
+        }
+        .open-links:hover { background-color: #333b4d; }
         .item-row { padding: 2px 0; }
         .item-row.done label { color: #6f7787; }
         .item-row.failed label { color: #ff8a8a; }
