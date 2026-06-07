@@ -2,6 +2,7 @@
 
 require "gtk3"
 require "ui/item_row"
+require "ui/links"
 
 module UI
   # Scrolling column that renders a BoardFetch::Result: a header per checklist
@@ -48,19 +49,44 @@ module UI
     private
 
     def append_group(group, on_toggle)
-      @list.pack_start(header(group.name), expand: false, fill: false, padding: 0)
+      @list.pack_start(header(group), expand: false, fill: false, padding: 0)
       group.items.each do |item|
         @list.pack_start(ItemRow.new(item, on_toggle: on_toggle), expand: false, fill: false, padding: 0)
       end
       @list.pack_start(spacer, expand: false, fill: false, padding: 4)
     end
 
-    def header(name)
+    # The grouping's heading. Just the name label when the group has no links;
+    # otherwise a row pairing the name with an "Open links (N)" button at the far
+    # right that launches every URL in the group's items (document order,
+    # duplicates kept).
+    def header(group)
+      label = header_label(group.name)
+      urls = group.items.flat_map { |item| Links.in_text(item.name) }
+      return label if urls.empty?
+
+      row = Gtk::Box.new(:horizontal, 6)
+      row.pack_start(label, expand: true, fill: true, padding: 0)
+      row.pack_end(open_links_button(urls), expand: false, fill: false, padding: 0)
+      row
+    end
+
+    def header_label(name)
       label = Gtk::Label.new(name)
       label.xalign = 0
       label.wrap = true
       label.style_context.add_class("checklist-header")
       label
+    end
+
+    def open_links_button(urls)
+      button = Gtk::Button.new(label: "Open links (#{urls.size})")
+      button.can_focus = false
+      button.style_context.add_class("open-links")
+      button.signal_connect("clicked") do
+        urls.each { |url| Gio::AppInfo.launch_default_for_uri(url, nil) }
+      end
+      button
     end
 
     def empty_label(reason)

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "gtk3"
+require "ui/links"
 
 module UI
   # One checklist item with a small state machine:
@@ -110,7 +111,7 @@ module UI
     # in the browser.
     def linkify(text)
       text.split.map do |word|
-        if word.start_with?("http")
+        if Links.url?(word)
           "(<a href=\"#{escape(word).gsub("\"", "&quot;")}\">link</a>)"
         else
           escape(word)
