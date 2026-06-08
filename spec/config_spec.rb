@@ -257,7 +257,7 @@ RSpec.describe Config do
       write_config("trello" => { "key" => "abc" })
 
       expect(described_class.new(path).setup_hint)
-        .to match(/key\/token missing/)
+        .to include("key/token missing")
     end
 
     it "is nil once fully configured" do
