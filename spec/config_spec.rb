@@ -73,6 +73,47 @@ RSpec.describe Config do
     end
   end
 
+  describe "#item_limit" do
+    it "defaults to unlimited (nil)" do
+      expect(described_class.new(path).item_limit).to be_nil
+    end
+
+    it "reads a positive integer from the file" do
+      write_config("view" => { "item_limit" => 3 })
+
+      expect(described_class.new(path).item_limit).to eq(3)
+    end
+
+    it "treats a hand-edited non-integer as unlimited" do
+      write_config("view" => { "item_limit" => "five" })
+
+      expect(described_class.new(path).item_limit).to be_nil
+    end
+
+    it "treats a hand-edited non-positive integer as unlimited" do
+      write_config("view" => { "item_limit" => 0 })
+
+      expect(described_class.new(path).item_limit).to be_nil
+    end
+
+    it "round-trips through the writer and save" do
+      config = described_class.new(path)
+      config.item_limit = 5
+      config.save
+
+      expect(described_class.new(path).item_limit).to eq(5)
+    end
+
+    it "saves a cleared limit back to nil" do
+      write_config("view" => { "item_limit" => 5 })
+      config = described_class.new(path)
+      config.item_limit = nil
+      config.save
+
+      expect(described_class.new(path).item_limit).to be_nil
+    end
+  end
+
   describe "#exist?" do
     it "is false with no file and true once one is present" do
       config = described_class.new(path)

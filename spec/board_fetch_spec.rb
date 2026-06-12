@@ -195,6 +195,62 @@ RSpec.describe BoardFetch do
     end
   end
 
+  describe "the per-group item limit" do
+    let(:checklists) do
+      [
+        api_checklist(
+          "id" => "cl-1",
+          "name" => "Big @big",
+          "pos" => 1,
+          "checkItems" => (1..4).map { |n| api_item("id" => "b#{n}", "name" => "B#{n}", "pos" => n) },
+        ),
+        api_checklist(
+          "id" => "cl-2",
+          "name" => "Small",
+          "pos" => 2,
+          "checkItems" => [api_item("id" => "s1", "name" => "S1")],
+        ),
+      ]
+    end
+
+    before { stub_cards([card_with(id: "card-1", checklists: checklists)]) }
+
+    it "caps each group at its first N items and records what was cut" do
+      group = lane_view.result_for([], limit: 2).groups.first
+
+      expect(group.items.map(&:name)).to eq(["B1", "B2"])
+      expect(group.hidden_count).to eq(2)
+    end
+
+    it "leaves groups at or under the limit untouched" do
+      group = lane_view.result_for([], limit: 2).groups.last
+
+      expect(group.items.map(&:name)).to eq(["S1"])
+      expect(group.hidden_count).to be_nil
+    end
+
+    it "keeps the group's identity fields on a capped copy" do
+      group = lane_view.result_for([], limit: 2).groups.first
+
+      expect(group.checklist_id).to eq("cl-1")
+      expect(group.name).to eq("Big @big")
+    end
+
+    it "caps tag-filtered groups the same way" do
+      group = lane_view.result_for(["@big"], limit: 3).groups.first
+
+      expect(group.items.map(&:name)).to eq(["B1", "B2", "B3"])
+      expect(group.hidden_count).to eq(1)
+    end
+
+    it "does not mutate the underlying default view" do
+      lane_view.result_for([], limit: 1)
+
+      expect(lane_view.default_result.groups.first.items.size).to eq(4)
+      expect(lane_view.default_result.groups.first.hidden_count).to be_nil
+    end
+  end
+
   describe "missing positions" do
     it "treats absent pos as 0 without blowing up" do
       checklist = api_checklist("checkItems" => [api_item]).tap do |cl|

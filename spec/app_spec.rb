@@ -31,13 +31,14 @@ RSpec.describe App do
 
   # A real Config on disk, with credentials matching the api_url helper so the
   # real TrelloClient App builds from it hits our stubs.
-  def make_config(key: TrelloHelpers::TEST_KEY, token: TrelloHelpers::TEST_TOKEN, **selection)
+  def make_config(key: TrelloHelpers::TEST_KEY, token: TrelloHelpers::TEST_TOKEN, limit: nil, **selection)
     data = {
       "trello" => { "key" => key, "token" => token },
       "selection" => {
         "board_id" => selection[:board_id],
         "lane_id" => selection[:lane_id],
       },
+      "view" => { "item_limit" => limit },
     }
     path = File.join(@config_dir, "config.json")
     File.write(path, JSON.generate(data))
@@ -79,7 +80,9 @@ RSpec.describe App do
     allow(header).to receive(:busy=)
     allow(window).to receive(:on_item_toggle) { |&block| callbacks[:toggle] = block }
     allow(window).to receive(:on_tag_change) { |&block| callbacks[:tag] = block }
+    allow(window).to receive(:on_limit_change) { |&block| callbacks[:limit] = block }
     allow(window).to receive(:set_tags)
+    allow(window).to receive(:item_limit=)
     allow(window).to receive(:show_all)
     allow(window).to receive(:apply_dock_behaviour)
     allow(window).to receive(:render)
@@ -390,6 +393,85 @@ RSpec.describe App do
 
       expect(tag_updates.last.last).to eq(Set.new)
       expect(renders.last.groups.map(&:name)).to eq(["Home @home", "Work @work"])
+    end
+  end
+
+  describe "the per-list item limit" do
+    let(:renders) { [] }
+
+    # One card whose single checklist has three items, so a cap of 2 truncates.
+    def big_card
+      checklist = api_checklist(
+        "id" => "cl1",
+        "name" => "Big @big",
+        "checkItems" => (1..3).map { |n| api_item("id" => "i#{n}", "name" => "I#{n}", "pos" => n) },
+      )
+      api_card("id" => "c1", "name" => "Card", "checklists" => [checklist])
+    end
+
+    before do
+      allow(window).to receive(:render) { |result| renders << result }
+      stub_boards([api_board("id" => "b1")])
+      stub_lists("b1", [api_list("id" => "l1")])
+      stub_request(:get, cards_url("l1")).to_return(body: [big_card].to_json)
+    end
+
+    it "tells the window the persisted limit on construction" do
+      config = make_config(board_id: "b1", lane_id: "l1", limit: 4)
+      described_class.new(config, header: header, window: window)
+
+      expect(window).to have_received(:item_limit=).with(4)
+    end
+
+    it "applies a persisted limit to the fetched view" do
+      config = make_config(board_id: "b1", lane_id: "l1", limit: 2)
+      described_class.new(config, header: header, window: window).start
+
+      expect(renders.last.groups.first.items.map(&:name)).to eq(["I1", "I2"])
+      expect(renders.last.groups.first.hidden_count).to eq(1)
+    end
+
+    it "caps the rendered groups and persists a newly chosen limit" do
+      app.start
+      callbacks[:limit].call(2)
+
+      expect(renders.last.groups.first.items.size).to eq(2)
+      expect(config.item_limit).to eq(2)
+      expect(Config.new(config.path).item_limit).to eq(2)
+    end
+
+    it "restores the full list when the cap is cleared" do
+      app.start
+      callbacks[:limit].call(2)
+      callbacks[:limit].call(nil)
+
+      expect(renders.last.groups.first.items.size).to eq(3)
+      expect(Config.new(config.path).item_limit).to be_nil
+    end
+
+    it "caps tag-filtered groups too" do
+      app.start
+      callbacks[:limit].call(2)
+      callbacks[:tag].call(Set["@big"])
+
+      expect(renders.last.groups.map(&:name)).to eq(["@big"])
+      expect(renders.last.groups.first.items.size).to eq(2)
+    end
+
+    it "keeps the limit across a refresh" do
+      app.start
+      callbacks[:limit].call(2)
+      callbacks[:refresh].call
+
+      expect(renders.last.groups.first.items.size).to eq(2)
+    end
+
+    it "persists but renders nothing when no lane has loaded yet" do
+      app
+      callbacks[:limit].call(2)
+
+      expect(window).not_to have_received(:render)
+      expect(Config.new(config.path).item_limit).to eq(2)
     end
   end
 

@@ -109,12 +109,12 @@ Metrics/AbcSize:
 # Offense count: 2
 # Configuration parameters: CountComments, CountAsOne.
 Metrics/ClassLength:
-  Max: 223
+  Max: 251
 
 # Offense count: 16
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.
 Metrics/MethodLength:
-  Max: 87
+  Max: 107
 
 # Offense count: 4
 # Configuration parameters: EnforcedStyle, AllowedPatterns, ForbiddenIdentifiers, ForbiddenPatterns.
@@ -195,6 +195,7 @@ Style/ClassAndModuleChildren:
     - 'lib/ui/dropdown.rb'
     - 'lib/ui/header.rb'
     - 'lib/ui/item_row.rb'
+    - 'lib/ui/limit_bar.rb'
     - 'lib/ui/links.rb'
     - 'lib/ui/tag_bar.rb'
     - 'lib/x11/strut.rb'
@@ -360,6 +361,7 @@ Style/StringConcatenation:
 Style/StringHashKeys:
   Exclude:
     - 'lib/config.rb'
+    - 'lib/ui/limit_bar.rb'
     - 'spec/app_spec.rb'
     - 'spec/board_fetch_spec.rb'
     - 'spec/config_spec.rb'

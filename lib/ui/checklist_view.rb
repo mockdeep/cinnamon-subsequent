@@ -6,7 +6,8 @@ require "ui/links"
 
 module UI
   # Scrolling column that renders a BoardFetch::Result: a header per checklist
-  # followed by its incomplete item rows, or a single empty-state message.
+  # followed by its incomplete item rows (plus a "+N more" hint when the
+  # per-list cap truncated the group), or a single empty-state message.
   # Horizontal scrolling is disabled so long item labels wrap instead of
   # widening the sidebar.
   class ChecklistView < Gtk::ScrolledWindow
@@ -53,6 +54,10 @@ module UI
       group.items.each do |item|
         @list.pack_start(ItemRow.new(item, on_toggle: on_toggle), expand: false, fill: false, padding: 0)
       end
+      hidden = group.hidden_count || 0
+      if hidden.positive?
+        @list.pack_start(more_hint(hidden), expand: false, fill: false, padding: 0)
+      end
       @list.pack_start(spacer, expand: false, fill: false, padding: 4)
     end
 
@@ -87,6 +92,15 @@ module UI
         urls.each { |url| Gio::AppInfo.launch_default_for_uri(url, nil) }
       end
       button
+    end
+
+    # Shown under a group the per-list cap truncated: the items still exist,
+    # they're just not rendered.
+    def more_hint(count)
+      label = Gtk::Label.new("+#{count} more")
+      label.xalign = 0
+      label.style_context.add_class("more-hint")
+      label
     end
 
     def empty_label(reason)
