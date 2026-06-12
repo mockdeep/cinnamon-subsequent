@@ -213,4 +213,6 @@ ones dropped) and **resets on a board/lane switch** (a different tag set).
 - `lib/sync.rb` — worker-thread + main-thread marshalling helper.
 - `lib/x11/strut.rb` — the Xlib strut call.
 - `lib/ui/` — `dock_window` (window + strut + CSS), `header`, `dropdown`,
-  `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`.
+  `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`,
+  `limit_bar` (the bottom items-per-list cap; persisted as `view.item_limit`
+  in the config, applied in-memory via `LaneView#result_for(…, limit:)`).

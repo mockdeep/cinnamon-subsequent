@@ -18,7 +18,9 @@ class App
     @client = client || build_client
     @lane_view = nil
     @selected_tags = Set.new
+    @item_limit = config.item_limit
     wire_callbacks
+    @window.item_limit = @item_limit
   end
 
   def start
@@ -51,6 +53,7 @@ class App
     @header.on_refresh      { refresh_view }
     @window.on_item_toggle  { |row, item, desired| toggle_item(row, item, desired) }
     @window.on_tag_change   { |selected| select_tags(selected) }
+    @window.on_limit_change { |limit| select_limit(limit) }
   end
 
   # Push a single item's new state to Trello; the row shows a spinner until
@@ -113,7 +116,22 @@ class App
   # User toggled tag chips: re-render from the held lane view, no refetch.
   def select_tags(selected)
     @selected_tags = selected.to_set
-    @window.render(@lane_view.result_for(@selected_tags)) if @lane_view
+    rerender
+  end
+
+  # User picked a new per-list cap: persist it and re-render from the held
+  # lane view — the full item lists are still in memory, so no refetch.
+  def select_limit(limit)
+    @item_limit = limit
+    @config.item_limit = limit
+    @config.save
+    rerender
+  end
+
+  def rerender
+    return unless @lane_view
+
+    @window.render(@lane_view.result_for(@selected_tags, limit: @item_limit))
   end
 
   # Reload the whole cascade (boards → lanes → cards) so the dropdowns
@@ -147,7 +165,7 @@ class App
     @lane_view = lane_view
     @selected_tags &= lane_view.tags.to_set(&:name)
     @window.set_tags(lane_view.tags, @selected_tags)
-    @window.render(lane_view.result_for(@selected_tags))
+    @window.render(lane_view.result_for(@selected_tags, limit: @item_limit))
     busy(false)
   end
 

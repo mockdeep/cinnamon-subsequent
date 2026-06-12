@@ -4,6 +4,7 @@ require "gtk3"
 require "x11/strut"
 require "ui/checklist_view"
 require "ui/tag_bar"
+require "ui/limit_bar"
 
 module UI
   # A borderless, full-height window pinned to a screen edge that reserves its
@@ -76,15 +77,27 @@ module UI
       @on_tag_change = block
     end
 
+    # Called when the per-list cap changes: block receives an Integer or nil.
+    def on_limit_change(&block)
+      @on_limit_change = block
+    end
+
     # Repopulate the tag bar; `selected` is the set of tag names to start pressed.
     def set_tags(tags, selected)
       @tag_bar.set_tags(tags, selected)
     end
 
+    # Reflect a persisted per-list cap in the limit bar (without firing change).
+    def item_limit=(limit)
+      @limit_bar.limit = limit
+    end
+
     # Replace the displayed checklists with a freshly fetched view model.
     def render(result)
       @checklist_view.render(result, on_toggle: @on_item_toggle)
-      total = result.groups.sum { |group| group.items.size }
+      # Count hidden (capped-off) items too: the strip shows what *remains*,
+      # not what happens to be rendered.
+      total = result.groups.sum { |group| group.items.size + (group.hidden_count || 0) }
       @strip_count.text = total.positive? ? total.to_s : ""
     end
 
@@ -158,6 +171,8 @@ module UI
       expanded.pack_start(@tag_bar, expand: false, fill: false, padding: 0)
       @checklist_view = ChecklistView.new
       expanded.pack_start(@checklist_view, expand: true, fill: true, padding: 0)
+      @limit_bar = LimitBar.new { |limit| @on_limit_change&.call(limit) }
+      expanded.pack_start(@limit_bar, expand: false, fill: false, padding: 0)
 
       # Non-homogeneous so the stack requests only the *current* child's width,
       # letting the window actually shrink to the strip.
@@ -217,6 +232,7 @@ module UI
         .item-row.failed label { color: #ff8a8a; }
         .empty-state { color: #9aa3b2; font-style: italic; }
         .loading { color: #9aa3b2; }
+        .more-hint { color: #6f7787; font-size: 11px; font-style: italic; }
 
         /* Dark scrollbar. Paint trough/scrolledwindow explicitly dark (NOT
            transparent — transparent reveals the light theme base behind the
@@ -265,6 +281,26 @@ module UI
         }
         .tag-chip:hover { background-color: #333b4d; }
         .tag-chip:checked { background-color: #34507e; color: #ffffff; border-color: #4a6aa5; }
+
+        /* Limit bar: slim strip along the window bottom holding the
+           items-per-list dropdown. */
+        .limit-bar { background-color: #181c25; border-top: 1px solid #3a4150; padding: 4px 8px; font-size: 11px; }
+        /* Child combinator: dims only the bar's own caption, not the label
+           nested inside the dropdown's face. */
+        .limit-bar > label { color: #9aa3b2; }
+        .limit-bar .dropdown {
+          background-image: none;
+          background-color: #2a3140;
+          color: #e6e6e6;
+          border: 1px solid #3a4150;
+          box-shadow: none;
+          text-shadow: none;
+          padding: 0 6px;
+          min-height: 0;
+          min-width: 0;
+        }
+        .limit-bar .dropdown:hover { background-color: #333b4d; }
+        .limit-bar .dropdown .caret { color: #9aa3b2; }
 
         /* Collapsed strip */
         .strip { background-color: #181c25; background-image: none; border: none; border-radius: 0; box-shadow: none; padding: 0; outline: none; }

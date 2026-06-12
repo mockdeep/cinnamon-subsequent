@@ -13,7 +13,7 @@
 # items, across every card in the lane, whose checklist carries that tag.
 class BoardFetch
   Result = Struct.new(:card_name, :groups, :empty_reason, keyword_init: true)
-  Group  = Struct.new(:checklist_id, :name, :items, keyword_init: true)
+  Group  = Struct.new(:checklist_id, :name, :items, :hidden_count, keyword_init: true)
   Item   = Struct.new(:id, :card_id, :checklist_id, :name, :state, keyword_init: true)
   Tag    = Struct.new(:name, :item_count, keyword_init: true)
 
@@ -22,15 +22,36 @@ class BoardFetch
   # nothing is selected, otherwise one group (heading + flat item list) per
   # selected tag, in name order. Unknown tag names are ignored, so a selection
   # carried across a refresh quietly drops tags that no longer exist.
+  #
+  # `limit` caps every group (default and tag views alike) at its first N items,
+  # recording how many were cut in the group's hidden_count so the UI can show
+  # a "+N more" hint; nil means uncapped.
   LaneView = Struct.new(:default_result, :tags, :items_by_tag, keyword_init: true) do
-    def result_for(selected)
+    def result_for(selected, limit: nil)
       names = Array(selected).select { |name| items_by_tag.key?(name) }.uniq.sort
-      return default_result if names.empty?
+      base =
+        if names.empty?
+          default_result
+        else
+          groups = names.map do |name|
+            Group.new(checklist_id: nil, name: name, items: items_by_tag[name])
+          end
+          Result.new(card_name: nil, groups: groups, empty_reason: nil)
+        end
+      limit ? capped(base, limit) : base
+    end
 
-      groups = names.map do |name|
-        Group.new(checklist_id: nil, name: name, items: items_by_tag[name])
+    private
+
+    def capped(result, limit)
+      groups = result.groups.map do |group|
+        next group if group.items.size <= limit
+
+        Group.new(checklist_id: group.checklist_id, name: group.name,
+                  items: group.items.first(limit),
+                  hidden_count: group.items.size - limit)
       end
-      Result.new(card_name: nil, groups: groups, empty_reason: nil)
+      Result.new(card_name: result.card_name, groups: groups, empty_reason: result.empty_reason)
     end
   end
 

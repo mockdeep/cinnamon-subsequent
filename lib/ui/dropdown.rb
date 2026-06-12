@@ -11,8 +11,12 @@ module UI
   # The button label ellipsizes, so two of these share a narrow row without
   # forcing the window wider.
   class Dropdown < Gtk::MenuButton
-    def initialize(&on_change)
+    # `popover_position:` is where the list opens relative to the button —
+    # :bottom for the header dropdowns, :top for ones sitting at the screen
+    # bottom (where a downward popover would have no room).
+    def initialize(popover_position: :bottom, &on_change)
       super()
+      @popover_position = popover_position
       @on_change = on_change
       @items = []
       @active_id = nil
@@ -57,8 +61,10 @@ module UI
 
     def build_popover
       @popover = Gtk::Popover.new(self)
-      @popover.position = :bottom
       self.popover = @popover
+      # After popover=, not before: MenuButton#popover= re-derives the position
+      # from the button's arrow direction, clobbering an earlier assignment.
+      @popover.position = @popover_position
 
       scroller = Gtk::ScrolledWindow.new
       scroller.set_policy(:never, :automatic)

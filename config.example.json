@@ -10,5 +10,8 @@
   "appearance": {
     "edge": "right",
     "width": 320
+  },
+  "view": {
+    "item_limit": null
   }
 }

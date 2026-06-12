@@ -4,7 +4,7 @@ require "json"
 require "fileutils"
 
 # Loads and persists ~/.config/cinnamon-subsequent/config.json.
-# Holds Trello credentials, the selected board/lane, and appearance prefs.
+# Holds Trello credentials, the selected board/lane, and appearance/view prefs.
 # The file is written 0600 (creds live here) under a 0700 directory.
 class Config
   DEFAULT_DIR = File.join(
@@ -16,7 +16,8 @@ class Config
   DEFAULTS = {
     "trello"     => { "key" => nil, "token" => nil },
     "selection"  => { "board_id" => nil, "lane_id" => nil },
-    "appearance" => { "edge" => "right", "width" => 320 }
+    "appearance" => { "edge" => "right", "width" => 320 },
+    "view"       => { "item_limit" => nil }
   }.freeze
 
   def self.load(path = DEFAULT_PATH)
@@ -40,12 +41,23 @@ class Config
   def edge        = dig("appearance", "edge").to_sym
   def width       = dig("appearance", "width")
 
+  # Per-list cap on rendered items; nil (or anything but a positive integer,
+  # in case the file was hand-edited) means unlimited.
+  def item_limit
+    value = dig("view", "item_limit")
+    value.is_a?(Integer) && value.positive? ? value : nil
+  end
+
   def board_id=(value)
     @data["selection"]["board_id"] = value
   end
 
   def lane_id=(value)
     @data["selection"]["lane_id"] = value
+  end
+
+  def item_limit=(value)
+    @data["view"]["item_limit"] = value
   end
 
   def exist?      = File.exist?(path)

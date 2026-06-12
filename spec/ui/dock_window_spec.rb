@@ -10,6 +10,7 @@ RSpec.describe UI::DockWindow do
   def strip_count = dock.instance_variable_get(:@strip_count).label
   def checklist_view = dock.instance_variable_get(:@checklist_view)
   def tag_bar = dock.instance_variable_get(:@tag_bar)
+  def limit_bar = dock.instance_variable_get(:@limit_bar)
 
   describe "#render" do
     it "shows the remaining-item count on the collapsed strip" do
@@ -28,6 +29,17 @@ RSpec.describe UI::DockWindow do
       dock.render(make_result(groups: [], empty_reason: "done"))
 
       expect(strip_count).to eq("")
+    end
+
+    it "counts items the per-list cap hid, not just the rendered ones" do
+      group = make_group(
+        items: [make_item, make_item(id: "i2")],
+        hidden_count: 3,
+      )
+
+      dock.render(make_result(groups: [group]))
+
+      expect(strip_count).to eq("5")
     end
 
     it "passes the toggle handler down to the rendered rows" do
@@ -68,6 +80,35 @@ RSpec.describe UI::DockWindow do
       dock.show_all
 
       expect { tag_bar.children.first.children.first.active = true }
+        .not_to raise_error
+    end
+  end
+
+  describe "#item_limit= / #on_limit_change" do
+    # The bar's dropdown list nests as popover > scroller > viewport > listbox.
+    def limit_dropdown = limit_bar.children.grep(UI::Dropdown).first
+    def limit_listbox = limit_dropdown.popover.child.child.child
+
+    it "reflects a persisted limit on the limit bar's dropdown" do
+      dock.item_limit = 3
+
+      expect(limit_dropdown.active_id).to eq("3")
+    end
+
+    it "relays a dropdown choice to the on_limit_change handler" do
+      captured = :unset
+      dock.on_limit_change { |limit| captured = limit }
+
+      # Row index 2 is the "2" entry ("All" is row 0).
+      limit_listbox.signal_emit("row-activated", limit_listbox.children[2])
+
+      expect(captured).to eq(2)
+    end
+
+    it "is a safe no-op to choose a limit when no handler is wired" do
+      row = limit_listbox.children[1]
+
+      expect { limit_listbox.signal_emit("row-activated", row) }
         .not_to raise_error
     end
   end

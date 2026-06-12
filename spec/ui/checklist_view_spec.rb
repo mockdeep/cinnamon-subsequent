@@ -39,6 +39,23 @@ RSpec.describe UI::ChecklistView do
       expect(rows.first.label).to eq("List A")
     end
 
+    it "adds a '+N more' hint after a group the limit truncated" do
+      group = make_group(items: [make_item], hidden_count: 4)
+
+      view.render(make_result(groups: [group]))
+
+      expect(rows.map(&:class)).to eq([Gtk::Label, UI::ItemRow, Gtk::Label, Gtk::Box])
+      hint = rows.fetch(2)
+      expect(hint.label).to eq("+4 more")
+      expect(hint.style_context.has_class?("more-hint")).to be(true)
+    end
+
+    it "shows no hint when the group was not truncated" do
+      view.render(make_result(groups: [make_group(hidden_count: nil)]))
+
+      expect(rows.map(&:class)).to eq([Gtk::Label, UI::ItemRow, Gtk::Box])
+    end
+
     it "replaces previous content on re-render" do
       view.render(make_result(groups: [make_group]))
       view.render(make_result(groups: [], empty_reason: "now empty"))
