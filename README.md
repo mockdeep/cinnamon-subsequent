@@ -19,6 +19,11 @@ Trello. It pins a full-height column to the right edge of the screen that:
   own heading. With nothing selected you get the normal first-card view.
 - has **Board** and **Lane** dropdowns and a **Refresh** button up top (Refresh
   reloads everything — boards, lanes, and the card).
+- shows a **Claude Code session tracker** in the footer — a row of colored dots,
+  one per live `claude` session, that pulse while busy, ring white when awaiting
+  permission, and mark the focused terminal. Click a dot to raise its terminal.
+  (This was a standalone Cinnamon extension that floated over the bottom-right
+  corner and blocked clicks; living in the sidebar's reserved space fixes that.)
 
 It's deliberately X11-only (Cinnamon/Muffin is X11) and GTK **3** (GTK4 dropped
 the window-manager hint APIs a dock needs).
@@ -30,6 +35,11 @@ the window-manager hint APIs a dock needs).
 - GTK 3 development headers, to build the `gtk3` gem:
   ```
   sudo apt install libgtk-3-dev
+  ```
+- For the Claude session dots (optional): `xdotool`, `jq`, `wmctrl`
+  (`xprop`/`gdbus` are usually preinstalled):
+  ```
+  sudo apt install xdotool jq wmctrl
   ```
 
 ## Setup
@@ -86,6 +96,24 @@ with:
 ```
 rm ~/.config/autostart/cinnamon-subsequent.desktop
 ```
+
+## Claude Code session dots
+
+To populate the footer dots, install the session hook (this is what feeds the
+sidebar; the dots are drawn by the sidebar itself, so there's no extension to
+enable):
+
+```
+./scripts/install-session-hook.sh
+```
+
+It symlinks `bin/claude-session-tracker` onto your PATH, creates the state
+directory the sidebar reads (`~/.local/state/claude-sessions/`), and merges the
+session lifecycle hooks into `~/.claude/settings.json` (backing it up first). It
+also removes the old standalone `claude-sessions@fletch` Cinnamon extension if a
+previous install left it behind. Focus tracking is window-level: clicking a dot
+raises (and tab-switches to) its terminal, and the focused terminal's dot gets a
+white center.
 
 ## Development
 

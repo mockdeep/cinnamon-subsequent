@@ -5,6 +5,7 @@ require "x11/strut"
 require "ui/checklist_view"
 require "ui/tag_bar"
 require "ui/limit_bar"
+require "ui/session_bar"
 
 module UI
   # A borderless, full-height window pinned to a screen edge that reserves its
@@ -63,6 +64,10 @@ module UI
       self.resizable = false
 
       build_content
+      @session_bar =
+        SessionBar.new(footer: @session_flow, strip: @strip_dots) do |session_id|
+          @on_session_focus&.call(session_id)
+        end
       @header.on_collapse { collapse }
       signal_connect("destroy") { Gtk.main_quit }
     end
@@ -80,6 +85,17 @@ module UI
     # Called when the per-list cap changes: block receives an Integer or nil.
     def on_limit_change(&block)
       @on_limit_change = block
+    end
+
+    # Called when a session dot is clicked: block receives the session id.
+    def on_session_focus(&block)
+      @on_session_focus = block
+    end
+
+    # Replace the session dots (footer + strip) from a list of Sessions::Session;
+    # focused_xid lights the dot whose terminal window is currently active.
+    def set_sessions(sessions, focused_xid)
+      @session_bar.render(sessions, focused_xid)
     end
 
     # Repopulate the tag bar; `selected` is the set of tag names to start pressed.
@@ -174,6 +190,17 @@ module UI
       @limit_bar = LimitBar.new { |limit| @on_limit_change&.call(limit) }
       expanded.pack_start(@limit_bar, expand: false, fill: false, padding: 0)
 
+      # Session dots live at the very bottom — a wrapping row that hides itself
+      # when there are no sessions, so it leaves no empty strip behind.
+      @session_flow = Gtk::FlowBox.new
+      @session_flow.style_context.add_class("session-bar")
+      @session_flow.selection_mode = :none
+      @session_flow.min_children_per_line = 1
+      @session_flow.max_children_per_line = 6
+      @session_flow.homogeneous = false
+      @session_flow.no_show_all = true
+      expanded.pack_start(@session_flow, expand: false, fill: false, padding: 0)
+
       # Non-homogeneous so the stack requests only the *current* child's width,
       # letting the window actually shrink to the strip.
       @stack = Gtk::Stack.new
@@ -201,6 +228,14 @@ module UI
       @strip_count.style_context.add_class("strip-count")
       box.pack_start(chevron, expand: false, fill: false, padding: 0)
       box.pack_start(@strip_count, expand: false, fill: false, padding: 0)
+
+      # Display-only session dots stacked under the count. Non-reactive, so a
+      # click anywhere on the strip (dots included) still expands it.
+      @strip_dots = Gtk::Box.new(:vertical, 6)
+      @strip_dots.halign = :center
+      @strip_dots.margin_top = 10
+      @strip_dots.no_show_all = true
+      box.pack_start(@strip_dots, expand: false, fill: false, padding: 0)
 
       button.add(box)
       button.signal_connect("clicked") { expand }
@@ -301,6 +336,13 @@ module UI
         }
         .limit-bar .dropdown:hover { background-color: #333b4d; }
         .limit-bar .dropdown .caret { color: #9aa3b2; }
+
+        /* Session dots footer: a wrapping row of Claude-session dots pinned to
+           the window bottom. The flowbox and its child wrappers stay
+           transparent — the dots are cairo-drawn and carry all the colour. */
+        .session-bar { background-color: #181c25; border-top: 1px solid #3a4150; padding: 6px; }
+        .session-bar, .session-bar flowboxchild { background-color: transparent; border: none; padding: 0; margin: 3px; min-width: 0; min-height: 0; }
+        .session-bar flowboxchild:selected { background-color: transparent; }
 
         /* Collapsed strip */
         .strip { background-color: #181c25; background-image: none; border: none; border-radius: 0; box-shadow: none; padding: 0; outline: none; }

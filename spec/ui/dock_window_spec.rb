@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "sessions/store"
 require "ui/dock_window"
 require "ui/header" # DockWindow takes a header but doesn't require it itself
 
@@ -11,6 +12,8 @@ RSpec.describe UI::DockWindow do
   def checklist_view = dock.instance_variable_get(:@checklist_view)
   def tag_bar = dock.instance_variable_get(:@tag_bar)
   def limit_bar = dock.instance_variable_get(:@limit_bar)
+  def session_flow = dock.instance_variable_get(:@session_flow)
+  def strip_dots = dock.instance_variable_get(:@strip_dots)
 
   describe "#render" do
     it "shows the remaining-item count on the collapsed strip" do
@@ -150,6 +153,67 @@ RSpec.describe UI::DockWindow do
       dock.expand
 
       expect(stack.visible_child_name).to eq("expanded")
+    end
+  end
+
+  describe "#set_sessions / #on_session_focus" do
+    def session(**overrides)
+      Sessions::Session.new(
+        id: "a",
+        color: "#cc241d",
+        status: "idle",
+        project: "p",
+        window_id: 1,
+        **overrides,
+      )
+    end
+
+    def footer_dots = session_flow.children.map(&:child)
+
+    it "renders a dot per session in both the footer and the strip" do
+      dock.set_sessions([session(id: "a"), session(id: "b", window_id: 2)], nil)
+
+      expect(footer_dots.size).to eq(2)
+      expect(strip_dots.children.size).to eq(2)
+      expect(footer_dots).to all(be_a(UI::SessionDot))
+    end
+
+    it "hides the footer and strip when there are no sessions" do
+      dock.show_all
+      dock.set_sessions([], nil)
+
+      expect(session_flow).not_to be_visible
+      expect(strip_dots).not_to be_visible
+    end
+
+    it "shows the footer once there are sessions" do
+      dock.show_all
+      dock.set_sessions([session], nil)
+
+      expect(session_flow).to be_visible
+    end
+
+    it "replaces the previous dots rather than appending" do
+      dock.set_sessions([session(id: "a"), session(id: "b", window_id: 2)], nil)
+      dock.set_sessions([session(id: "c")], nil)
+
+      expect(footer_dots.size).to eq(1)
+    end
+
+    it "marks the dot whose window matches the focused xid as focused" do
+      dock.set_sessions([session(id: "a", window_id: 5)], 5)
+
+      expect(footer_dots.first.instance_variable_get(:@focused)).to be(true)
+    end
+
+    it "relays a footer dot click to the on_session_focus handler" do
+      captured = nil
+      dock.on_session_focus { |id| captured = id }
+      dock.set_sessions([session(id: "abc")], nil)
+
+      footer_dots.first.signal_emit("button-press-event", Gdk::EventButton.new(:button_press))
+
+      expect(captured).to eq("abc")
     end
   end
 
