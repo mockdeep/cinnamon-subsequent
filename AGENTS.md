@@ -13,6 +13,12 @@ it (pushed to Trello immediately). A tag bar under the menu filters across all
 cards in the lane by `@tag` (parsed from checklist names). Single process,
 Ruby + GTK3.
 
+It also folds in a **Claude Code session tracker**: a footer row of colored dots,
+one per live `claude` session, that used to be a standalone Cinnamon extension
+floating over the bottom-right corner (and blocking clicks there). Moving it into
+the sidebar's reserved strut column fixes that — the dots now live in space no
+window can cover. See "The session dots" below.
+
 ## Running & verifying
 
 It's a GUI app on **X11** (`DISPLAY=:0`), so you can launch it and see it on
@@ -72,8 +78,13 @@ bundle exec rake                # spec + rubocop (the default task)
 xvfb-run -a bundle exec rake    # headless (what CI runs)
 ```
 
-RSpec covers **all of `lib/`** at 100% line + branch coverage (SimpleCov reports
-it; there is **no** coverage gate):
+RSpec covers nearly all of `lib/` (SimpleCov reports ~96%; there is **no**
+coverage gate). The uncovered slivers are the bits that can only be exercised
+against a live X server / real process and are verified **on screen** instead:
+`X11::ActiveWindow.current` (the Xlib property read — its decode logic *is*
+specced via a stubbed `Lib`, but the live `XOpenDisplay` path isn't),
+`Sessions::Focus.spawn` (shells out to the hook), and `Watcher#start`'s GLib
+timer registration (`#tick` is specced directly):
 
 - `config.rb`, `trello_client.rb`, `board_fetch.rb`, `pid_file.rb`,
   `sidebar_control.rb` — pure, no GTK. Trello calls are stubbed with WebMock (no
@@ -161,6 +172,16 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
   (`~/.local/share/mise/shims/ruby`) errors "No version is set for shim" in a
   login session with no global mise version. `scripts/install-autostart.sh`
   bakes `mise which ruby` (an absolute install path) into the `.desktop` Exec.
+- **The session watcher is the *only* continuous poll loop.** `Sessions::Watcher`
+  ticks a 1s `GLib::Timeout` reading the state dir + active window. The Trello
+  side stays deliberately manual-refresh — don't "unify" them into one poller.
+  The watcher fires `on_change` only when the visible state changes (id / color /
+  status / window / focus), so the pulse animation isn't reset every second.
+- **Session focus is window-level only.** The old extension tracked Gnome Terminal
+  *tab* focus via D-Bus `org.gtk.Actions.Changed` — that needs the Cinnamon shell
+  and was dropped in the fold. The focused-dot ring matches on `_NET_ACTIVE_WINDOW`
+  (`lib/x11/active_window.rb`, Xlib via fiddle like the strut). Click-to-focus
+  still gets tab switching for free: it shells out to the hook's `focus` action.
 
 ## Where things live
 
@@ -211,8 +232,31 @@ ones dropped) and **resets on a board/lane switch** (a different tag set).
 - `lib/board_fetch.rb` — builds the view model (the structs the UI renders) and
   the lane-wide tag index (`LaneView`, with in-memory `result_for` filtering).
 - `lib/sync.rb` — worker-thread + main-thread marshalling helper.
-- `lib/x11/strut.rb` — the Xlib strut call.
+- `lib/x11/strut.rb` — the Xlib strut call. `lib/x11/active_window.rb` — the Xlib
+  `_NET_ACTIVE_WINDOW` read for the focused-dot ring.
 - `lib/ui/` — `dock_window` (window + strut + CSS), `header`, `dropdown`,
   `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`,
   `limit_bar` (the bottom items-per-list cap; persisted as `view.item_limit`
-  in the config, applied in-memory via `LaneView#result_for(…, limit:)`).
+  in the config, applied in-memory via `LaneView#result_for(…, limit:)`),
+  `session_bar` + `session_dot` (the Claude-session footer dots).
+- `lib/sessions/` — `store` (reads/reaps the hook's state files into `Session`
+  structs), `watcher` (the 1s poll loop), `focus` (shells out to the hook).
+- `bin/claude-session-tracker` — the Bash hook Claude Code invokes on session
+  lifecycle events; writes per-session JSON to
+  `~/.local/state/claude-sessions/`. `scripts/install-session-hook.sh` symlinks
+  it onto PATH and merges the hooks into `~/.claude/settings.json`.
+
+## The session dots
+
+Two halves talk through JSON files in `~/.local/state/claude-sessions/`. The
+**hook** (`bin/claude-session-tracker`, language-agnostic Bash) is wired into
+Claude Code's lifecycle hooks and writes `<session_id>.json` with status, theme
+color (from the project's `.terminal-theme`), pid, and the terminal's X window
+id. The **sidebar** polls that dir (`Sessions::Watcher`), reaps sessions whose
+pid has no `/proc` entry (`Sessions::Store`), and renders a dot per session in
+two places: the expanded footer (a `FlowBox`) and the collapsed strip (a thin
+column). Active sessions pulse; permission ones get a white ring; the one whose
+window is focused gets a white inner dot. Both sinks set `no_show_all` and are
+hidden when there are no sessions, so the footer leaves no empty strip behind.
+Strip dots are non-reactive so a click still expands the strip; footer dots
+shell out to the hook's `focus` action to raise (and tab-switch to) the terminal.

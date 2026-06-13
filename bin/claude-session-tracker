@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR="${CLAUDE_SESSION_STATE_DIR:-$HOME/.local/state/claude-sessions}"
+mkdir -p "$STATE_DIR"
+
+action="${1:-}"
+
+# Read stdin (hook JSON payload)
+input=""
+if [ ! -t 0 ]; then
+  input=$(cat)
+fi
+
+# Extract session_id from input JSON
+session_id=""
+if [ -n "$input" ]; then
+  session_id=$(echo "$input" | jq -r '.session_id // empty')
+fi
+
+if [ -z "$session_id" ]; then
+  exit 0
+fi
+
+state_file="$STATE_DIR/${session_id}.json"
+timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+find_theme_color() {
+  local dir="$1"
+  local theme_name=""
+
+  # Walk up from cwd looking for .terminal-theme
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/.terminal-theme" ]; then
+      theme_name=$(cat "$dir/.terminal-theme")
+      break
+    fi
+    dir=$(dirname "$dir")
+  done
+
+  if [ -z "$theme_name" ]; then
+    return
+  fi
+
+  # Look up theme file
+  local theme_file=""
+  if [ -n "${DOT_PATH:-}" ] && [ -f "$DOT_PATH/bash/terminal-themes/$theme_name" ]; then
+    theme_file="$DOT_PATH/bash/terminal-themes/$theme_name"
+  elif [ -f "$HOME/Dropbox/dotfiles/bash/terminal-themes/$theme_name" ]; then
+    theme_file="$HOME/Dropbox/dotfiles/bash/terminal-themes/$theme_name"
+  fi
+
+  if [ -z "$theme_file" ]; then
+    return
+  fi
+
+  # Extract prompt_fill value
+  local color
+  color=$(grep -E '^prompt_fill=' "$theme_file" | cut -d= -f2)
+  echo "${color:-}"
+}
+
+find_pty() {
+  local pid=$$
+  local pty=""
+  while [ "$pid" -gt 1 ]; do
+    pty=$(readlink /proc/"$pid"/fd/0 2>/dev/null || true)
+    if [[ "$pty" == /dev/pts/* ]]; then
+      echo "$pty"
+      return
+    fi
+    pid=$(awk '{print $4}' /proc/"$pid"/stat 2>/dev/null || echo 1)
+  done
+}
+
+find_window_id() {
+  if [ -n "${WINDOWID:-}" ]; then
+    echo "$WINDOWID"
+    return
+  fi
+
+  # At session-start the terminal is focused, so getactivewindow is reliable
+  local wid
+  wid=$(xdotool getactivewindow 2>/dev/null || true)
+  echo "${wid:-}"
+}
+
+find_tab_info() {
+  local wid="$1"
+  if [ -z "$wid" ] || [ "$wid" = "0" ]; then
+    return
+  fi
+
+  # Read _GTK_WINDOW_OBJECT_PATH from the X window to get the D-Bus window path
+  local hex_wid
+  hex_wid=$(printf '0x%x' "$wid")
+  local dbus_path
+  dbus_path=$(xprop -id "$hex_wid" _GTK_WINDOW_OBJECT_PATH 2>/dev/null \
+    | sed -n 's/.*= "\(.*\)"/\1/p')
+
+  if [ -z "$dbus_path" ]; then
+    return
+  fi
+
+  # Read the current active-tab index — since we just launched in this tab, it's ours
+  local tab_index
+  tab_index=$(gdbus call --session \
+    --dest org.gnome.Terminal \
+    --object-path "${dbus_path}" \
+    --method org.gtk.Actions.Describe active-tab 2>/dev/null \
+    | sed -n 's/.*\[<\([0-9]*\)>\].*/\1/p')
+
+  if [ -n "$tab_index" ]; then
+    echo "${dbus_path} ${tab_index}"
+  fi
+}
+
+find_current_tab_index() {
+  local wid="$1" dwp="$2" pty="$3" stored_ti="$4"
+
+  # Write a marker to our PTY's terminal title
+  local marker="__claude_focus_${session_id}__"
+  printf '\033]2;%s\007' "$marker" > "$pty" 2>/dev/null
+  sleep 0.05
+
+  # Try the stored index first (fast path: tabs weren't reordered)
+  gdbus call --session \
+    --dest org.gnome.Terminal \
+    --object-path "$dwp" \
+    --method org.gtk.Actions.Activate \
+    active-tab "[<int32 $stored_ti>]" '{}' >/dev/null 2>&1 || true
+
+  local hex_wid
+  hex_wid=$(printf '0x%x' "$wid")
+  local title
+  title=$(xprop -id "$hex_wid" _NET_WM_NAME 2>/dev/null \
+    | sed -n 's/.*= "\(.*\)"/\1/p')
+
+  if [[ "$title" == *"$marker"* ]]; then
+    printf '\033]2;\007' > "$pty" 2>/dev/null
+    echo "$stored_ti"
+    return
+  fi
+
+  # Stored index is stale — scan tabs to find the right one
+  local i
+  for i in $(seq 0 20); do
+    [ "$i" = "$stored_ti" ] && continue
+    gdbus call --session \
+      --dest org.gnome.Terminal \
+      --object-path "$dwp" \
+      --method org.gtk.Actions.Activate \
+      active-tab "[<int32 $i>]" '{}' >/dev/null 2>&1 || break
+
+    title=$(xprop -id "$hex_wid" _NET_WM_NAME 2>/dev/null \
+      | sed -n 's/.*= "\(.*\)"/\1/p')
+    if [[ "$title" == *"$marker"* ]]; then
+      printf '\033]2;\007' > "$pty" 2>/dev/null
+      # Update the stored tab index for next time
+      local tmp="${state_file}.tmp.$$"
+      jq --argjson ti "$i" '.tab_index = $ti' "$state_file" > "$tmp"
+      mv "$tmp" "$state_file"
+      echo "$i"
+      return
+    fi
+  done
+
+  # Couldn't find the tab — clear marker and fall back to stored index
+  printf '\033]2;\007' > "$pty" 2>/dev/null
+  echo "$stored_ti"
+}
+
+find_claude_pid() {
+  local pid=$PPID
+  while [ "$pid" -gt 1 ]; do
+    local comm
+    comm=$(cat /proc/"$pid"/comm 2>/dev/null || echo "")
+    if [ "$comm" = "claude" ]; then
+      echo "$pid"
+      return
+    fi
+    pid=$(awk '{print $4}' /proc/"$pid"/stat 2>/dev/null || echo 1)
+  done
+  # Fallback to PPID if claude process not found
+  echo "$PPID"
+}
+
+update_state() {
+  local new_status="$1"
+  if [ -f "$state_file" ]; then
+    local tmp="${state_file}.tmp.$$"
+    jq --arg status "$new_status" --arg ts "$timestamp" \
+      '.status = $status | .timestamp = $ts' "$state_file" > "$tmp"
+    mv "$tmp" "$state_file"
+  fi
+}
+
+case "$action" in
+  session-start)
+    cwd=$(echo "$input" | jq -r '.cwd // empty')
+    project_name=$(basename "$cwd")
+    pty_path=$(find_pty)
+    window_id=$(find_window_id)
+    theme_color=$(find_theme_color "$cwd")
+
+    # Get D-Bus window path and tab index for tab switching
+    dbus_window_path=""
+    tab_index=""
+    tab_info=$(find_tab_info "$window_id")
+    if [ -n "$tab_info" ]; then
+      dbus_window_path="${tab_info% *}"
+      tab_index="${tab_info#* }"
+    fi
+
+    # Clean up any existing sessions with the same PID (stale from previous
+    # session that didn't get a session-end hook)
+    claude_pid=$(find_claude_pid)
+    for f in "$STATE_DIR"/*.json; do
+      [ -f "$f" ] || continue
+      [ "$f" = "$state_file" ] && continue
+      existing_pid=$(jq -r '.pid // empty' "$f" 2>/dev/null || true)
+      if [ "$existing_pid" = "$claude_pid" ]; then
+        rm -f "$f"
+      fi
+    done
+
+    local_tmp="${state_file}.tmp.$$"
+    jq -n \
+      --arg sid "$session_id" \
+      --arg cwd "$cwd" \
+      --arg pname "$project_name" \
+      --arg wid "$window_id" \
+      --arg tc "$theme_color" \
+      --arg ts "$timestamp" \
+      --arg dwp "$dbus_window_path" \
+      --arg ti "$tab_index" \
+      --arg pty "${pty_path:-}" \
+      --argjson pid "$claude_pid" \
+      '{
+        session_id: $sid,
+        cwd: $cwd,
+        project_name: $pname,
+        window_id: $wid,
+        theme_color: $tc,
+        status: "idle",
+        timestamp: $ts,
+        pid: $pid,
+        dbus_window_path: $dwp,
+        tab_index: ($ti | if . == "" then null else tonumber end),
+        pty_path: ($pty | if . == "" then null else . end)
+      }' > "$local_tmp"
+    mv "$local_tmp" "$state_file"
+    ;;
+
+  tool-active)
+    update_state "active"
+    ;;
+
+  notification-idle)
+    update_state "idle"
+    ;;
+
+  notification-permission)
+    update_state "permission"
+    ;;
+
+  prompt-submit)
+    update_state "active"
+    ;;
+
+  session-end)
+    rm -f "$state_file"
+    ;;
+
+  focus)
+    if [ -f "$state_file" ]; then
+      wid=$(jq -r '.window_id // empty' "$state_file")
+      if [ -n "$wid" ]; then
+        # Raise the window
+        hex_wid=$(printf '0x%08x' "$wid")
+        wmctrl -i -a "$hex_wid"
+
+        # Switch to the correct tab via D-Bus if tab info is available
+        dwp=$(jq -r '.dbus_window_path // empty' "$state_file")
+        ti=$(jq -r '.tab_index // empty' "$state_file")
+        pty=$(jq -r '.pty_path // empty' "$state_file")
+        if [ -n "$dwp" ] && [ -n "$ti" ]; then
+          if [ -n "$pty" ] && [ -e "$pty" ]; then
+            # Re-detect tab index in case tabs were reordered
+            ti=$(find_current_tab_index "$wid" "$dwp" "$pty" "$ti")
+          fi
+          if [ -n "$ti" ]; then
+            gdbus call --session \
+              --dest org.gnome.Terminal \
+              --object-path "$dwp" \
+              --method org.gtk.Actions.Activate \
+              active-tab "[<int32 $ti>]" '{}' >/dev/null 2>&1 || true
+          fi
+        fi
+      fi
+    fi
+    ;;
+
+  *)
+    echo "Unknown action: $action" >&2
+    exit 1
+    ;;
+esac

@@ -35,6 +35,17 @@ class App
     load_boards
   end
 
+  # Push a fresh set of Claude sessions to the dock's footer dots. Driven by the
+  # Sessions::Watcher poll loop, which is wired up in bin/todo-sidebar.
+  def update_sessions(sessions, focused_xid)
+    @window.set_sessions(sessions, focused_xid)
+  end
+
+  # Wire the dock's session-dot click to a focus action (the hook).
+  def on_session_focus(&)
+    @window.on_session_focus(&)
+  end
+
   private
 
   def build_window

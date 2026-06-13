@@ -13,6 +13,8 @@ $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 require "config"
 require "pid_file"
 require "app"
+require "sessions/watcher"
+require "sessions/focus"
 
 # Record this instance so `rake sidebar:*` can find it; clear on a clean exit
 # (window close). A SIGTERM/kill leaves the file behind, but PidFile.running_pid
@@ -20,5 +22,16 @@ require "app"
 PidFile.write
 at_exit { PidFile.clear }
 
-App.new(Config.load).start
+app = App.new(Config.load)
+app.start
+app.on_session_focus { |session_id| Sessions::Focus.call(session_id) }
+
+# Continuously mirror Claude Code's session state into the footer dots. This is
+# the only polling loop in the app; the Trello side stays manual-refresh.
+watcher = Sessions::Watcher.new
+watcher.on_change do |sessions, focused_xid|
+  app.update_sessions(sessions, focused_xid)
+end
+watcher.start
+
 Gtk.main
