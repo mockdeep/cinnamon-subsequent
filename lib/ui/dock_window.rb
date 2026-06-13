@@ -65,7 +65,7 @@ module UI
 
       build_content
       @session_bar =
-        SessionBar.new(footer: @session_flow, strip: @strip_dots) do |session_id|
+        SessionBar.new(footer: @session_box, strip: @strip_dots) do |session_id|
           @on_session_focus&.call(session_id)
         end
       @header.on_collapse { collapse }
@@ -192,14 +192,14 @@ module UI
 
       # Session dots live at the very bottom — a wrapping row that hides itself
       # when there are no sessions, so it leaves no empty strip behind.
-      @session_flow = Gtk::FlowBox.new
-      @session_flow.style_context.add_class("session-bar")
-      @session_flow.selection_mode = :none
-      @session_flow.min_children_per_line = 1
-      @session_flow.max_children_per_line = 6
-      @session_flow.homogeneous = false
-      @session_flow.no_show_all = true
-      expanded.pack_start(@session_flow, expand: false, fill: false, padding: 0)
+      # A full-width row of session dots, evenly distributed (flexbox
+      # space-around): SessionBar packs each dot expand+!fill, so each gets an
+      # equal slice of the width and sits centered in it — two dots spread far
+      # apart, four pack closer. A Box (not FlowBox) so the row stays single-line.
+      @session_box = Gtk::Box.new(:horizontal, 0)
+      @session_box.style_context.add_class("session-bar")
+      @session_box.no_show_all = true
+      expanded.pack_start(@session_box, expand: false, fill: false, padding: 0)
 
       # Non-homogeneous so the stack requests only the *current* child's width,
       # letting the window actually shrink to the strip.
@@ -340,9 +340,7 @@ module UI
         /* Session dots footer: a wrapping row of Claude-session dots pinned to
            the window bottom. The flowbox and its child wrappers stay
            transparent — the dots are cairo-drawn and carry all the colour. */
-        .session-bar { background-color: #181c25; border-top: 1px solid #3a4150; padding: 6px; }
-        .session-bar, .session-bar flowboxchild { background-color: transparent; border: none; padding: 0; margin: 3px; min-width: 0; min-height: 0; }
-        .session-bar flowboxchild:selected { background-color: transparent; }
+        .session-bar { background-color: #181c25; border-top: 1px solid #3a4150; padding: 8px 6px; }
 
         /* Collapsed strip */
         .strip { background-color: #181c25; background-image: none; border: none; border-radius: 0; box-shadow: none; padding: 0; outline: none; }

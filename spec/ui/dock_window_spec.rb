@@ -12,7 +12,7 @@ RSpec.describe UI::DockWindow do
   def checklist_view = dock.instance_variable_get(:@checklist_view)
   def tag_bar = dock.instance_variable_get(:@tag_bar)
   def limit_bar = dock.instance_variable_get(:@limit_bar)
-  def session_flow = dock.instance_variable_get(:@session_flow)
+  def session_box = dock.instance_variable_get(:@session_box)
   def strip_dots = dock.instance_variable_get(:@strip_dots)
 
   describe "#render" do
@@ -168,7 +168,7 @@ RSpec.describe UI::DockWindow do
       )
     end
 
-    def footer_dots = session_flow.children.map(&:child)
+    def footer_dots = session_box.children
 
     it "renders a dot per session in both the footer and the strip" do
       dock.set_sessions([session(id: "a"), session(id: "b", window_id: 2)], nil)
@@ -182,7 +182,7 @@ RSpec.describe UI::DockWindow do
       dock.show_all
       dock.set_sessions([], nil)
 
-      expect(session_flow).not_to be_visible
+      expect(session_box).not_to be_visible
       expect(strip_dots).not_to be_visible
     end
 
@@ -190,7 +190,7 @@ RSpec.describe UI::DockWindow do
       dock.show_all
       dock.set_sessions([session], nil)
 
-      expect(session_flow).to be_visible
+      expect(session_box).to be_visible
     end
 
     it "replaces the previous dots rather than appending" do
