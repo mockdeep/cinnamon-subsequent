@@ -5,9 +5,9 @@ require "ui/session_dot"
 
 module UI
   # Drives the session dots, rendering the same set into two sinks: the expanded
-  # footer (a wrapping FlowBox) and the collapsed strip (a thin column). Owns the
-  # pulse animation that breathes the active dots. Not a widget itself: DockWindow
-  # builds the two sink containers and hands them in.
+  # footer (a full-width Box where dots are evenly distributed) and the collapsed
+  # strip (a thin column). Owns the pulse animation that breathes the active dots.
+  # Not a widget itself: DockWindow builds the two sink containers and hands them in.
   class SessionBar
     PULSE_INTERVAL_MS = 80
     PULSE_MIN = 0.3
@@ -41,10 +41,12 @@ module UI
 
     private
 
+    # expand + !fill gives each dot an equal slice of the footer width, centered
+    # in its slice — the flexbox space-around distribution.
     def build_footer_dot(session, focused)
       dot = SessionDot.new(session, focused: focused)
       dot.on_click { @on_focus&.call(session.id) }
-      @footer.add(dot)
+      @footer.pack_start(dot, expand: true, fill: false, padding: 0)
       dot
     end
 
