@@ -9,7 +9,7 @@ module UI
   # SessionBar. Cairo-drawn so we control alpha precisely (CSS opacity on a
   # styled box can't be tweened frame by frame).
   class SessionDot < Gtk::DrawingArea
-    DEFAULT_SIZE = 16
+    DEFAULT_SIZE = 32
     DEFAULT_COLOR = "#cc241d"
 
     attr_accessor :alpha

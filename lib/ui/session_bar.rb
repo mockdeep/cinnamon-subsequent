@@ -13,7 +13,7 @@ module UI
     PULSE_MIN = 0.3
     PULSE_MAX = 0.95
     PULSE_STEP = 0.05
-    STRIP_DOT_SIZE = 12
+    STRIP_DOT_SIZE = 22
 
     def initialize(footer:, strip:, &on_focus)
       @footer = footer # Gtk::FlowBox in the expanded column
