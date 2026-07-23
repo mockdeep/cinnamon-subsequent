@@ -40,7 +40,7 @@ GEM
       atk (= 4.3.6)
       gdk3 (= 4.3.6)
     hashdiff (1.2.1)
-    json (2.19.8)
+    json (2.19.9)
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     matrix (0.4.3)
@@ -144,7 +144,7 @@ CHECKSUMS
   gobject-introspection (4.3.6) sha256=6f09f66555bec243e258238be76b5d530604e88c1ba069d76a1b6613bc75876b
   gtk3 (4.3.6) sha256=aded2114051b3290ebbe9170287de6dfcc06ddc5127d56543ebedd2e80a69c99
   hashdiff (1.2.1) sha256=9c079dbc513dfc8833ab59c0c2d8f230fa28499cc5efb4b8dd276cf931457cd1
-  json (2.19.8) sha256=6354310fd76ef69b87d5bd1f38b40d730613baf90b6803d2d0a48f618d32dfaa
+  json (2.19.9) sha256=9b9025b7cdddafa38d316eca0b2358488e42d417045c1b90d216a9fefe46b79a
   language_server-protocol (3.17.0.5) sha256=fd1e39a51a28bf3eec959379985a72e296e9f9acfce46f6a79d31ca8760803cc
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   matrix (0.4.3) sha256=a0d5ab7ddcc1973ff690ab361b67f359acbb16958d1dc072b8b956a286564c5b
