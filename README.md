@@ -18,7 +18,8 @@ Trello. It pins a full-height column to the right edge of the screen that:
   incomplete items from **every card in the lane**, each selected tag under its
   own heading. With nothing selected you get the normal first-card view.
 - has **Board** and **Lane** dropdowns and a **Refresh** button up top (Refresh
-  reloads everything — boards, lanes, and the card).
+  reloads everything — boards, lanes, and the card), and **refreshes itself**
+  after 15 idle minutes so items you ticked off elsewhere disappear on their own.
 - shows a **Claude Code session tracker** in the footer — a row of colored dots,
   one per live `claude` session, that pulse while busy, ring white when awaiting
   permission, and mark the focused terminal. Click a dot to raise its terminal.
@@ -82,6 +83,7 @@ the window-manager hint APIs a dock needs).
 | `selection.lane_id`    | Persisted lane                                    |
 | `appearance.edge`      | Currently `right`                                 |
 | `appearance.width`     | Sidebar width in (logical) pixels, default `320`  |
+| `view.refresh_interval_minutes` | Idle minutes before the list refetches itself, default `15`; `0` turns auto-refresh off |
 
 ## Autostart on login
 
@@ -144,3 +146,11 @@ find one started at login. Run the test suite with `bundle exec rake` (or
   incomplete-only) — while keeping your current selection. This is also the
   recovery path when the sidebar starts with **no network**: it shows an error and
   empty dropdowns, and a single **Refresh** once you're online fills everything in.
+- **Auto-refresh** picks up changes you made elsewhere (phone, Trello web). After
+  15 minutes with no interaction the list quietly refetches itself, and keeps doing
+  so every 15 minutes while it sits idle. Anything you click — a checkbox, a tag, a
+  dropdown — restarts that countdown, so a background reload can never land on a
+  row you're in the middle of using. It's quiet by design: no loading spinner over
+  the list, and a failed refetch leaves your items on screen rather than replacing
+  them with an error. Change the interval (or set `0` to switch it off) with
+  `view.refresh_interval_minutes`.

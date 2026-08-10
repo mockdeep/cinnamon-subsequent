@@ -179,11 +179,14 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
   (`~/.local/share/mise/shims/ruby`) errors "No version is set for shim" in a
   login session with no global mise version. `scripts/install-autostart.sh`
   bakes `mise which ruby` (an absolute install path) into the `.desktop` Exec.
-- **The session watcher is the *only* continuous poll loop.** `Sessions::Watcher`
-  ticks a 1s `GLib::Timeout` reading the state dir + active window. The Trello
-  side stays deliberately manual-refresh — don't "unify" them into one poller.
-  The watcher fires `on_change` only when the visible state changes (id / color /
+- **Two timers, deliberately unrelated — don't "unify" them into one poller.**
+  `Sessions::Watcher` ticks a 1s `GLib::Timeout` reading the state dir + active
+  window; it fires `on_change` only when the visible state changes (id / color /
   status / window / focus), so the pulse animation isn't reset every second.
+  `AutoRefresh` ticks every 30s but only *fires* after the sidebar has sat idle
+  for `view.refresh_interval_minutes` (default 15). They poll different things at
+  different rates for different reasons: one is a local file/X read that must feel
+  instant, the other is a network call that must stay rare.
 - **Session focus is window-level only.** The old extension tracked Gnome Terminal
   *tab* focus via D-Bus `org.gtk.Actions.Changed` — that needs the Cinnamon shell
   and was dropped in the fold. The focused-dot ring matches on `_NET_ACTIVE_WINDOW`
@@ -196,13 +199,17 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
   (`0600`). Never in the repo. Also holds the UI prefs the sidebar writes as you
   change them — `appearance.font_size` (the `A−`/`A+` steppers) and
   `view.item_limit`; both fall back to a default if hand-edited to nonsense.
+  `view.refresh_interval_minutes` is hand-edit-only (nothing in the UI writes it);
+  `0` disables auto-refresh. It can't be disabled with `null` — `deep_merge`
+  hands an explicit null back to the default — hence 0 as the off switch.
 - **Pidfile:** `$XDG_RUNTIME_DIR/cinnamon-subsequent.pid` (falls back to the
   config dir). Written by the app on boot, read by the `sidebar:*` rake tasks
   (`lib/pid_file.rb`). Not authoritative — always liveness/identity-checked.
 - No on-disk task cache: a deliberate choice — show a fresh loader rather than a
   potentially stale list. Offline isn't handled by caching but by **refresh
   recovery** (see "The Trello model" below): a start with no network leaves empty
-  dropdowns that a single Refresh repopulates once the connection is back.
+  dropdowns that a single Refresh repopulates once the connection is back — or
+  that the next auto-refresh tick repopulates on its own.
 
 ## The Trello model, briefly
 
@@ -219,6 +226,18 @@ with **no network** (boards/lanes never loaded), where a leaf-only refresh would
 leave the dropdowns permanently empty even after reconnecting. The persisted
 `board_id`/`lane_id` keep the current selection across the reload. Cost: every
 refresh is the full 3-call cascade, not one card fetch.
+
+**Auto-refresh is the quiet inverse of that** (`AutoRefresh` → `App#refresh_quietly`).
+It re-enters at the *leaf* — one `cards_with_checklists` call, since the dropdowns
+can't have changed while nobody was touching the sidebar — with two deliberate
+differences from the button: no `render_loading` over the list (a background
+reload shouldn't blank the items or lose scroll position), and a failure that
+`warn`s and keeps the current list instead of replacing it with "Trello error:".
+The one case it *does* run the loud cascade is when there's no `@lane_view` yet —
+the cold-start-offline state, where there's nothing on screen worth protecting and
+the cascade is exactly the recovery path. Every user callback is wrapped in
+`App#interaction`, which `touch`es the clock; that's the whole reason a background
+reload can't land on a row mid-click, so keep new callbacks wrapped.
 
 **Tags span the whole lane; the leaf view doesn't.** The lane fetch is a single
 `TrelloClient#cards_with_checklists` request — cards + checklists + check-items
@@ -241,6 +260,8 @@ ones dropped) and **resets on a board/lane switch** (a different tag set).
 - `lib/board_fetch.rb` — builds the view model (the structs the UI renders) and
   the lane-wide tag index (`LaneView`, with in-memory `result_for` filtering).
 - `lib/sync.rb` — worker-thread + main-thread marshalling helper.
+- `lib/auto_refresh.rb` — the idle clock behind auto-refresh (`touch` on every
+  interaction, fires once the interval has elapsed, and again each interval after).
 - `lib/x11/strut.rb` — the Xlib strut call. `lib/x11/active_window.rb` — the Xlib
   `_NET_ACTIVE_WINDOW` read for the focused-dot ring.
 - `lib/ui/` — `dock_window` (window + strut, and the one CSS provider),

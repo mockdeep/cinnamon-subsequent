@@ -12,11 +12,12 @@ require "tmpdir"
 require "app"
 
 RSpec.describe App do
-  subject(:app) { described_class.new(config, header: header, window: window) }
+  subject(:app) { build_app(config) }
 
-  let(:header) { instance_double(UI::Header)                }
-  let(:window) { instance_double(UI::DockWindow)            }
-  let(:config) { make_config(board_id: "b1", lane_id: "l1") }
+  let(:header)       { instance_double(UI::Header)                }
+  let(:window)       { instance_double(UI::DockWindow)            }
+  let(:auto_refresh) { instance_double(AutoRefresh)               }
+  let(:config)       { make_config(board_id: "b1", lane_id: "l1") }
 
   # Captures the blocks App wires onto its collaborators so tests can fire a
   # board/lane/refresh/toggle the way a real user interaction would.
@@ -27,6 +28,10 @@ RSpec.describe App do
       @config_dir = dir
       example.run
     end
+  end
+
+  def build_app(config)
+    described_class.new(config, header: header, window: window, auto_refresh: auto_refresh)
   end
 
   # A real Config on disk, with credentials matching the api_url helper so the
@@ -88,6 +93,9 @@ RSpec.describe App do
     allow(window).to receive(:apply_dock_behaviour)
     allow(window).to receive(:render)
     allow(window).to receive(:render_loading)
+    allow(auto_refresh).to receive(:on_refresh) { |&block| callbacks[:auto_refresh] = block }
+    allow(auto_refresh).to receive(:touch)
+    allow(auto_refresh).to receive(:start)
 
     # Sync delivers asynchronously (worker thread → GLib::Idle). Run it inline
     # so the cascade resolves synchronously while preserving Sync's contract:
@@ -147,6 +155,12 @@ RSpec.describe App do
       expect(header).to have_received(:busy=).with(true).at_least(:once)
       expect(header).to have_received(:busy=).with(false).once
     end
+
+    it "starts the idle refresh timer" do
+      app.start
+
+      expect(auto_refresh).to have_received(:start)
+    end
   end
 
   context "when Trello is not configured" do
@@ -165,6 +179,12 @@ RSpec.describe App do
 
       expect { callbacks[:refresh].call }.not_to raise_error
       expect(header).not_to have_received(:set_boards)
+    end
+
+    it "doesn't start the idle timer — there's nothing to refresh" do
+      app.start
+
+      expect(auto_refresh).not_to have_received(:start)
     end
   end
 
@@ -275,6 +295,74 @@ RSpec.describe App do
     end
   end
 
+  describe "auto-refreshing after an idle spell" do
+    let(:renders)  { [] }
+    let(:loadings) { [] }
+
+    before do
+      allow(window).to receive(:render) { |result| renders << result }
+      allow(window).to receive(:render_loading) { loadings << :loading }
+      stub_boards([api_board("id" => "b1")])
+      stub_lists("b1", [api_list("id" => "l1")])
+      stub_cards("l1", [api_card("id" => "c1", "name" => "Card", "checklists" => [])])
+      app.start
+      renders.clear
+      loadings.clear
+    end
+
+    it "refetches only the lane's cards, not the whole cascade" do
+      callbacks[:auto_refresh].call
+
+      expect(a_request(:get, cards_url("l1"))).to have_been_made.twice
+      expect(a_request(:get, api_url("/members/me/boards", fields: "name", filter: "open")))
+        .to have_been_made.once
+      expect(renders.size).to eq(1)
+    end
+
+    it "doesn't replace the list with a loading spinner" do
+      callbacks[:auto_refresh].call
+
+      expect(loadings).to be_empty
+    end
+
+    it "leaves the current list alone when the background fetch fails" do
+      stub_request(:get, cards_url("l1")).to_return(status: 500)
+
+      expect { callbacks[:auto_refresh].call }
+        .to output(/Auto-refresh failed/).to_stderr
+
+      expect(renders).to be_empty
+      expect(header).to have_received(:busy=).with(false).at_least(:once)
+    end
+
+    it "treats an interaction as activity, so the idle clock restarts" do
+      callbacks[:tag].call(Set.new)
+      callbacks[:limit].call(3)
+
+      expect(auto_refresh).to have_received(:touch).at_least(:twice)
+    end
+  end
+
+  describe "auto-refreshing a sidebar that never loaded" do
+    # Offline at launch: the boards call fails, so there's no lane view to
+    # protect and the dropdowns are empty. The next tick should run the loud
+    # cascade instead, recovering without the user pressing Refresh.
+    before do
+      stub_request(:get, api_url("/members/me/boards", fields: "name", filter: "open"))
+        .to_return({ status: 500 }, { body: [api_board("id" => "b1")].to_json })
+      stub_lists("b1", [api_list("id" => "l1")])
+      stub_cards("l1", [])
+      app.start
+    end
+
+    it "re-runs the full cascade so the dropdowns repopulate" do
+      callbacks[:auto_refresh].call
+
+      expect(header).to have_received(:set_boards).with([api_board("id" => "b1")], "b1")
+      expect(header).to have_received(:set_lanes).with([api_list("id" => "l1")], "l1")
+    end
+  end
+
   describe "toggling an item" do
     let(:row) { instance_double(UI::ItemRow) }
     let(:item) do
@@ -326,7 +414,7 @@ RSpec.describe App do
   describe "tag filtering" do
     # Capture what the window is told to render / which tags it's given, so we
     # can assert on the *latest* state after a sequence of interactions.
-    let(:renders) { [] }
+    let(:renders)     { [] }
     let(:tag_updates) { [] }
 
     def tagged_card(id: "c1")
@@ -418,15 +506,13 @@ RSpec.describe App do
     end
 
     it "tells the window the persisted limit on construction" do
-      config = make_config(board_id: "b1", lane_id: "l1", limit: 4)
-      described_class.new(config, header: header, window: window)
+      build_app(make_config(board_id: "b1", lane_id: "l1", limit: 4))
 
       expect(window).to have_received(:item_limit=).with(4)
     end
 
     it "applies a persisted limit to the fetched view" do
-      config = make_config(board_id: "b1", lane_id: "l1", limit: 2)
-      described_class.new(config, header: header, window: window).start
+      build_app(make_config(board_id: "b1", lane_id: "l1", limit: 2)).start
 
       expect(renders.last.groups.first.items.map(&:name)).to eq(["I1", "I2"])
       expect(renders.last.groups.first.hidden_count).to eq(1)

@@ -114,6 +114,32 @@ RSpec.describe Config do
     end
   end
 
+  describe "#refresh_interval" do
+    it "defaults to the built-in interval, in seconds" do
+      expect(described_class.new(path).refresh_interval)
+        .to eq(described_class::DEFAULT_REFRESH_INTERVAL_MINUTES * 60)
+    end
+
+    it "reads minutes from the file and returns seconds" do
+      write_config("view" => { "refresh_interval_minutes" => 5 })
+
+      expect(described_class.new(path).refresh_interval).to eq(300)
+    end
+
+    it "is nil (auto-refresh off) when set to 0" do
+      write_config("view" => { "refresh_interval_minutes" => 0 })
+
+      expect(described_class.new(path).refresh_interval).to be_nil
+    end
+
+    it "falls back to the default for a hand-edited non-integer" do
+      write_config("view" => { "refresh_interval_minutes" => "often" })
+
+      expect(described_class.new(path).refresh_interval)
+        .to eq(described_class::DEFAULT_REFRESH_INTERVAL_MINUTES * 60)
+    end
+  end
+
   describe "#font_size" do
     let(:default_size) { described_class::DEFAULT_FONT_SIZE }
 

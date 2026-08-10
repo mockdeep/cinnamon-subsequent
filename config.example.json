@@ -13,6 +13,7 @@
     "font_size": 13
   },
   "view": {
-    "item_limit": null
+    "item_limit": null,
+    "refresh_interval_minutes": 15
   }
 }
