@@ -114,6 +114,34 @@ RSpec.describe Config do
     end
   end
 
+  describe "#font_size" do
+    let(:default_size) { described_class::DEFAULT_FONT_SIZE }
+
+    it "defaults to the built-in size" do
+      expect(described_class.new(path).font_size).to eq(default_size)
+    end
+
+    it "reads a positive integer from the file" do
+      write_config("appearance" => { "font_size" => 17 })
+
+      expect(described_class.new(path).font_size).to eq(17)
+    end
+
+    it "falls back to the default for a hand-edited non-integer" do
+      write_config("appearance" => { "font_size" => "big" })
+
+      expect(described_class.new(path).font_size).to eq(default_size)
+    end
+
+    it "round-trips through the writer and save" do
+      config = described_class.new(path)
+      config.font_size = 15
+      config.save
+
+      expect(described_class.new(path).font_size).to eq(15)
+    end
+  end
+
   describe "#exist?" do
     it "is false with no file and true once one is present" do
       config = described_class.new(path)

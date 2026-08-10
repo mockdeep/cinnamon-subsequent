@@ -116,6 +116,47 @@ RSpec.describe UI::DockWindow do
     end
   end
 
+  describe "#font_size= / #on_font_size_change" do
+    def stepper(text) = limit_bar.children.grep(Gtk::Button).find { |b| b.label == text }
+
+    it "starts at the size it was built with" do
+      window = described_class.new(header: UI::Header.new, font_size: 17)
+
+      expect(window.font_size).to eq(17)
+      expect(window.instance_variable_get(:@limit_bar).font_size).to eq(17)
+    end
+
+    it "reflects a size set after construction on the footer steppers" do
+      dock.font_size = 16
+
+      expect(dock.font_size).to eq(16)
+      expect(limit_bar.font_size).to eq(16)
+    end
+
+    it "does not fire the handler when the size is set programmatically" do
+      captured = :unset
+      dock.on_font_size_change { |size| captured = size }
+
+      dock.font_size = 16
+
+      expect(captured).to eq(:unset)
+    end
+
+    it "restyles and relays a stepper click to the handler" do
+      captured = :unset
+      dock.on_font_size_change { |size| captured = size }
+
+      stepper("A+").signal_emit("clicked")
+
+      expect(captured).to eq(14)
+      expect(dock.font_size).to eq(14)
+    end
+
+    it "is a safe no-op to step the size when no handler is wired" do
+      expect { stepper("A−").signal_emit("clicked") }.not_to raise_error
+    end
+  end
+
   describe "#render_loading" do
     it "shows the loading row in the content area" do
       dock.render_loading

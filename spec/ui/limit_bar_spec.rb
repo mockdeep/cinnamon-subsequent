@@ -3,9 +3,16 @@
 require "ui/limit_bar"
 
 RSpec.describe UI::LimitBar do
-  subject(:bar) { described_class.new { |limit| changes << limit } }
+  subject(:bar) do
+    described_class.new(
+      font_size: font_size,
+      on_font_change: ->(size) { sizes << size },
+    ) { |limit| changes << limit }
+  end
 
-  let(:changes) { [] }
+  let(:changes)   { [] }
+  let(:sizes)     { [] }
+  let(:font_size) { 13 }
 
   def dropdown = bar.children.grep(UI::Dropdown).first
   def face_text = dropdown.child.children.grep(Gtk::Label).first.label
@@ -55,11 +62,84 @@ RSpec.describe UI::LimitBar do
     end
   end
 
+  describe "the A- / A+ steppers" do
+    def smaller = bar.children.grep(Gtk::Button).find { |b| b.label == "A−" }
+    def bigger  = bar.children.grep(Gtk::Button).find { |b| b.label == "A+" }
+
+    it "steps the size down and reports the new one" do
+      smaller.signal_emit("clicked")
+
+      expect(sizes).to eq([12])
+      expect(bar.font_size).to eq(12)
+    end
+
+    it "steps the size up and reports the new one" do
+      bigger.signal_emit("clicked")
+
+      expect(sizes).to eq([14])
+    end
+
+    context "when already at the bottom of the range" do
+      let(:font_size) { UI::LimitBar::FONT_RANGE.first }
+
+      it "disables the smaller stepper and reports nothing further" do
+        expect(smaller).not_to be_sensitive
+
+        smaller.signal_emit("clicked")
+
+        expect(sizes).to be_empty
+        expect(bar.font_size).to eq(UI::LimitBar::FONT_RANGE.first)
+      end
+    end
+
+    context "when already at the top of the range" do
+      let(:font_size) { UI::LimitBar::FONT_RANGE.last }
+
+      it "disables the bigger stepper and reports nothing further" do
+        expect(bigger).not_to be_sensitive
+
+        bigger.signal_emit("clicked")
+
+        expect(sizes).to be_empty
+      end
+    end
+
+    it "clamps a size that was hand-edited out of range" do
+      bar.font_size = 99
+
+      expect(bar.font_size).to eq(UI::LimitBar::FONT_RANGE.last)
+      expect(bigger).not_to be_sensitive
+    end
+
+    it "re-enables a stepper once the size moves off its stop" do
+      bar.font_size = UI::LimitBar::FONT_RANGE.first
+      bar.font_size = UI::LimitBar::FONT_RANGE.first + 1
+
+      expect(smaller).to be_sensitive
+    end
+  end
+
+  describe "#font_size=" do
+    it "adopts a persisted size without firing on_font_change" do
+      bar.font_size = 17
+
+      expect(bar.font_size).to eq(17)
+      expect(sizes).to be_empty
+    end
+  end
+
   it "tolerates being built without an on_change block" do
     plain = described_class.new
     rows = plain.children.grep(UI::Dropdown).first.popover.child.child.child
 
     expect { rows.signal_emit("row-activated", rows.children.fetch(2)) }
       .not_to raise_error
+  end
+
+  it "tolerates a stepper click with no on_font_change hook" do
+    plain = described_class.new
+    step = plain.children.grep(Gtk::Button).find { |b| b.label == "A+" }
+
+    expect { step.signal_emit("clicked") }.not_to raise_error
   end
 end

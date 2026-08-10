@@ -137,6 +137,13 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
 - **Threading.** Network runs on a worker thread via `Sync.run`; results return
   to the UI **only** through `GLib::Idle.add`. Never touch widgets off the main
   thread.
+- **One CSS provider, reloaded — not a second provider stacked on top.**
+  `UI::Styles.sheet(base)` renders the whole sheet from a single base font size
+  (secondary text `base − 2`, icons a few px over), and `DockWindow` keeps that
+  provider in an ivar so a text-size change just reloads it and every widget
+  restyles live. Adding a second provider for "just the font size" would leave
+  two sheets fighting at equal priority. Sizes are px, not `em`/`%` — GTK3's CSS
+  supports relative font sizes only patchily.
 - **The window is permanently in CSS `:backdrop` state** — it never takes focus
   (`accept_focus = false`). When writing CSS, remember normal/`:hover` states may
   behave unexpectedly; the widget path shows `window:backdrop`.
@@ -186,7 +193,9 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
 ## Where things live
 
 - **Trello credentials + selected board/lane:** `~/.config/cinnamon-subsequent/config.json`
-  (`0600`). Never in the repo.
+  (`0600`). Never in the repo. Also holds the UI prefs the sidebar writes as you
+  change them — `appearance.font_size` (the `A−`/`A+` steppers) and
+  `view.item_limit`; both fall back to a default if hand-edited to nonsense.
 - **Pidfile:** `$XDG_RUNTIME_DIR/cinnamon-subsequent.pid` (falls back to the
   config dir). Written by the app on boot, read by the `sidebar:*` rake tasks
   (`lib/pid_file.rb`). Not authoritative — always liveness/identity-checked.
@@ -234,10 +243,12 @@ ones dropped) and **resets on a board/lane switch** (a different tag set).
 - `lib/sync.rb` — worker-thread + main-thread marshalling helper.
 - `lib/x11/strut.rb` — the Xlib strut call. `lib/x11/active_window.rb` — the Xlib
   `_NET_ACTIVE_WINDOW` read for the focused-dot ring.
-- `lib/ui/` — `dock_window` (window + strut + CSS), `header`, `dropdown`,
-  `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`,
-  `limit_bar` (the bottom items-per-list cap; persisted as `view.item_limit`
-  in the config, applied in-memory via `LaneView#result_for(…, limit:)`),
+- `lib/ui/` — `dock_window` (window + strut, and the one CSS provider),
+  `styles` (the stylesheet itself, built around a base font size), `header`,
+  `dropdown`, `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`,
+  `limit_bar` (the bottom bar: the items-per-list cap, persisted as
+  `view.item_limit` and applied in-memory via `LaneView#result_for(…, limit:)`,
+  plus the `A−`/`A+` text-size steppers, persisted as `appearance.font_size`),
   `session_bar` + `session_dot` (the Claude-session footer dots).
 - `lib/sessions/` — `store` (reads/reaps the hook's state files into `Session`
   structs), `watcher` (the 1s poll loop), `focus` (shells out to the hook).

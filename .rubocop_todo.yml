@@ -204,6 +204,7 @@ Style/ClassAndModuleChildren:
     - 'lib/ui/links.rb'
     - 'lib/ui/session_bar.rb'
     - 'lib/ui/session_dot.rb'
+    - 'lib/ui/styles.rb'
     - 'lib/ui/tag_bar.rb'
     - 'lib/x11/active_window.rb'
     - 'lib/x11/strut.rb'
