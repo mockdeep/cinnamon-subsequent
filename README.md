@@ -16,7 +16,9 @@ Trello. It pins a full-height column to the right edge of the screen that:
 - lets you **filter by `@tag`** — a wrapping row of tag chips sits under the menu
   (a tag is any `@word` in a checklist's name); click chips to show matching
   incomplete items from **every card in the lane**, each selected tag under its
-  own heading. With nothing selected you get the normal first-card view.
+  own heading. A `<no tag>` chip leads the row, gathering the lane's checklists
+  that carry no tag at all. With nothing selected you get the normal first-card
+  view.
 - has **Board** and **Lane** dropdowns and a **Refresh** button up top (Refresh
   reloads everything — boards, lanes, and the card), and **refreshes itself**
   after 15 idle minutes so items you ticked off elsewhere disappear on their own.
@@ -140,7 +142,10 @@ find one started at login. Run the test suite with `bundle exec rake` (or
   the list. Completed items stay visible (struck-through, undoable) until the next
   **Refresh**.
 - **Tags are lane-scoped.** The chips come from `@words` in checklist names across
-  every card in the current lane; the bar hides itself when a lane has no `@tags`.
+  every card in the current lane, plus a `<no tag>` chip for the checklists that
+  carry none; the bar hides only when a lane has nothing left to show. Because
+  the default view is first-card-only, `<no tag>` is useful even in a lane with
+  no `@tags` at all — it widens the list to every card.
   The selection survives a Refresh but resets when you switch board or lane.
 - **Refresh** reloads the whole cascade — boards, lanes, and the card (refetching
   incomplete-only) — while keeping your current selection. This is also the

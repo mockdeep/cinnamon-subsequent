@@ -3,10 +3,11 @@
 require "gtk3"
 
 module UI
-  # A wrapping row of toggle chips, one per "@tag" found in the lane, shown
-  # under the header. Selecting chips filters the checklist view to matching
-  # items; each selected tag gets its own heading. The bar hides itself when
-  # the lane has no tags, so the default view loses no vertical space.
+  # A wrapping row of toggle chips, one per "@tag" found in the lane (plus
+  # "<no tag>" for the checklists carrying none), shown under the header.
+  # Selecting chips filters the checklist view to matching items; each selected
+  # tag gets its own heading. The bar hides itself when the lane yields no tags
+  # at all - an empty lane - so those views lose no vertical space.
   #
   # Built as a FlowBox (which wraps chips onto multiple rows) holding
   # independent ToggleButtons, rather than relying on FlowBox's own single-row
