@@ -4,6 +4,7 @@ require "config"
 require "trello_client"
 require "board_fetch"
 require "sync"
+require "auto_refresh"
 require "ui/header"
 require "ui/dock_window"
 
@@ -11,11 +12,12 @@ require "ui/dock_window"
 # Every network call runs on a worker thread (via Sync) and renders its result
 # back on the main thread; the header shows a busy spinner meanwhile.
 class App
-  def initialize(config, header: UI::Header.new, window: nil, client: nil)
+  def initialize(config, header: UI::Header.new, window: nil, client: nil, auto_refresh: nil)
     @config = config
     @header = header
     @window = window || build_window
     @client = client || build_client
+    @auto_refresh = auto_refresh || AutoRefresh.new(interval: config.refresh_interval)
     @lane_view = nil
     @selected_tags = Set.new
     @item_limit = config.item_limit
@@ -33,6 +35,7 @@ class App
     end
 
     load_boards
+    @auto_refresh.start
   end
 
   # Push a fresh set of Claude sessions to the dock's footer dots. Driven by the
@@ -61,14 +64,25 @@ class App
     TrelloClient.new(key: @config.trello_key, token: @config.trello_token)
   end
 
+  # Every user-facing callback goes through `interaction`, which both runs the
+  # action and tells the auto-refresh clock the user is still here. That's the
+  # whole guard against a background reload landing on a row mid-click.
   def wire_callbacks
-    @header.on_board_change { |board_id| select_board(board_id) }
-    @header.on_lane_change  { |lane_id| select_lane(lane_id) }
-    @header.on_refresh      { refresh_view }
-    @window.on_item_toggle  { |row, item, desired| toggle_item(row, item, desired) }
-    @window.on_tag_change   { |selected| select_tags(selected) }
-    @window.on_limit_change { |limit| select_limit(limit) }
-    @window.on_font_size_change { |size| select_font_size(size) }
+    @header.on_board_change { |board_id| interaction { select_board(board_id) } }
+    @header.on_lane_change  { |lane_id| interaction { select_lane(lane_id) } }
+    @header.on_refresh      { interaction { refresh_view } }
+    @window.on_item_toggle do |row, item, desired|
+      interaction { toggle_item(row, item, desired) }
+    end
+    @window.on_tag_change   { |selected| interaction { select_tags(selected) } }
+    @window.on_limit_change { |limit| interaction { select_limit(limit) } }
+    @window.on_font_size_change { |size| interaction { select_font_size(size) } }
+    @auto_refresh.on_refresh { refresh_quietly }
+  end
+
+  def interaction
+    @auto_refresh.touch
+    yield
   end
 
   # Push a single item's new state to Trello; the row shows a spinner until
@@ -166,12 +180,29 @@ class App
     load_boards if @client
   end
 
-  def fetch_and_render
-    @window.render_loading
+  # The unattended refresh, fired by AutoRefresh once the sidebar has sat idle.
+  # Deliberately cheaper and quieter than the Refresh button: one card fetch
+  # rather than the full cascade (the dropdowns can't have changed while nobody
+  # was touching them), no loading spinner over the list, and a failure that
+  # leaves the current items alone.
+  #
+  # The exception is a sidebar that never got a lane — a cold start with no
+  # network, or no board picked yet. There the loud cascade *is* the right move:
+  # there's nothing on screen worth protecting, and it's the path that repopulates
+  # the empty dropdowns. So an offline start now heals itself once you're back
+  # online, without waiting for you to press Refresh.
+  def refresh_quietly
+    return unless @client
+
+    @lane_view ? fetch_and_render(quiet: true) : load_boards
+  end
+
+  def fetch_and_render(quiet: false)
+    @window.render_loading unless quiet
     busy(true)
     Sync.run(-> { BoardFetch.new(@client, @config).call },
              on_success: ->(lane_view) { finish_lane(lane_view) },
-             on_error: method(:show_error))
+             on_error: quiet ? method(:log_error) : method(:show_error))
   end
 
   def persist(board_id, lane_id)
@@ -203,6 +234,14 @@ class App
 
   def show_error(error)
     finish(empty("Trello error: #{error.message}"))
+  end
+
+  # A background refresh that failed (offline, Trello hiccup). Keep whatever is
+  # on screen and let the next tick try again — wiping a usable list for an error
+  # the user never asked for would be worse than showing a few stale items.
+  def log_error(error)
+    warn("Auto-refresh failed: #{error.message}")
+    busy(false)
   end
 
   def busy(flag) = @header.busy = flag

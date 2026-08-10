@@ -168,10 +168,10 @@ RSpec/InstanceVariable:
 RSpec/MultipleExpectations:
   Max: 6
 
-# Offense count: 2
+# Offense count: 3
 # Configuration parameters: AllowSubject.
 RSpec/MultipleMemoizedHelpers:
-  Max: 6
+  Max: 7
 
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).

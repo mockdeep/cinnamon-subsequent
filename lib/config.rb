@@ -14,12 +14,16 @@ class Config
   DEFAULT_PATH = File.join(DEFAULT_DIR, "config.json")
 
   DEFAULT_FONT_SIZE = 13
+  DEFAULT_REFRESH_INTERVAL_MINUTES = 15
 
   DEFAULTS = {
     "trello"     => { "key" => nil, "token" => nil },
     "selection"  => { "board_id" => nil, "lane_id" => nil },
     "appearance" => { "edge" => "right", "width" => 320, "font_size" => DEFAULT_FONT_SIZE },
-    "view"       => { "item_limit" => nil }
+    "view"       => {
+      "item_limit" => nil,
+      "refresh_interval_minutes" => DEFAULT_REFRESH_INTERVAL_MINUTES
+    }
   }.freeze
 
   def self.load(path = DEFAULT_PATH)
@@ -55,6 +59,17 @@ class Config
   def item_limit
     value = dig("view", "item_limit")
     value.is_a?(Integer) && value.positive? ? value : nil
+  end
+
+  # Minutes of no interaction before the list quietly refetches itself, given in
+  # seconds (what AutoRefresh wants). Set the key to 0 to switch auto-refresh
+  # off; a non-integer (hand-edited to nonsense) falls back to the default.
+  # Note `null` won't disable it — an explicit null loses to the default in
+  # deep_merge, so 0 is the off switch.
+  def refresh_interval
+    value = dig("view", "refresh_interval_minutes")
+    minutes = value.is_a?(Integer) ? value : DEFAULT_REFRESH_INTERVAL_MINUTES
+    minutes.positive? ? minutes * 60 : nil
   end
 
   def board_id=(value)
