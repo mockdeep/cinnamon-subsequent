@@ -11,11 +11,16 @@
 # Tags are words beginning with "@" in a *checklist* name; an item inherits its
 # checklist's tags. The tag index maps each tag to the flat list of incomplete
 # items, across every card in the lane, whose checklist carries that tag.
+# Checklists with no tags gather under a "<no tag>" pseudo-tag, present only
+# when the lane also has real ones.
 class BoardFetch
   Result = Struct.new(:card_name, :groups, :empty_reason, keyword_init: true)
   Group  = Struct.new(:checklist_id, :name, :items, :hidden_count, keyword_init: true)
   Item   = Struct.new(:id, :card_id, :checklist_id, :name, :state, keyword_init: true)
   Tag    = Struct.new(:name, :item_count, keyword_init: true)
+
+  # Pseudo-tag gathering the lane's untagged checklists.
+  UNTAGGED = "<no tag>"
 
   # The default first-card view plus the lane's tag index. `result_for` turns a
   # set of selected tag names into the Result to render: the default view when
@@ -97,20 +102,27 @@ class BoardFetch
   end
 
   # tag name => incomplete items, across every card, whose checklist has the tag.
+  # Untagged checklists collect under UNTAGGED, so their items stay reachable
+  # once a tag is selected. Its "<" sorts before "@", putting the chip first.
+  # It stands alone in a lane with no real tags, where it still earns its place:
+  # the default view is first-card-only, so the chip widens it to the whole lane.
   def build_index(cards)
     index = {}
     cards.each do |card|
       in_order(card.fetch("checklists", [])).each do |cl|
-        tags = tag_names(cl["name"])
-        next if tags.empty?
-
         items = incomplete_items(card["id"], cl)
         next if items.empty?
 
-        tags.each { |tag| (index[tag] ||= []).concat(items) }
+        index_keys(cl["name"]).each { |tag| (index[tag] ||= []).concat(items) }
       end
     end
     index
+  end
+
+  # A checklist's tags, or the untagged pseudo-tag when it carries none.
+  def index_keys(checklist_name)
+    tags = tag_names(checklist_name)
+    tags.empty? ? [UNTAGGED] : tags
   end
 
   def tags_from(index)

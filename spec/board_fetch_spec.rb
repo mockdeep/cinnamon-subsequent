@@ -154,10 +154,10 @@ RSpec.describe BoardFetch do
 
     it "lists tags across all cards, sorted, with incomplete-item counts" do
       expect(lane_view.tags.map { |t| [t.name, t.item_count] })
-        .to eq([["@home", 2], ["@urgent", 1], ["@work", 1]])
+        .to eq([["<no tag>", 1], ["@home", 2], ["@urgent", 1], ["@work", 1]])
     end
 
-    it "ignores checklists with no @tag in their name" do
+    it "does not turn an untagged checklist's name into a tag" do
       expect(lane_view.tags.map(&:name)).not_to include("Untagged list")
     end
 
@@ -192,6 +192,72 @@ RSpec.describe BoardFetch do
       result = lane_view.result_for(["@home", "@gone"])
 
       expect(result.groups.map(&:name)).to eq(["@home"])
+    end
+  end
+
+  describe "the \"<no tag>\" pseudo-tag" do
+    # One checklist named with a tag / without one, holding the given items.
+    def tagged(id, *items)
+      api_checklist("id" => id, "name" => "List @tag", "checkItems" => items)
+    end
+
+    def untagged(id, *items)
+      api_checklist("id" => id, "name" => "Plain list", "checkItems" => items)
+    end
+
+    def lane(*cards)
+      stub_cards(
+        cards.each_with_index.map do |checklists, i|
+          card_with(id: "card-#{i + 1}", checklists: checklists)
+        end,
+      )
+    end
+
+    let(:one)      { api_item("id" => "u1", "name" => "One") }
+    let(:two)      { api_item("id" => "u2", "name" => "Two") }
+    let(:done)     { api_item("id" => "u3", "state" => "complete") }
+    let(:tag_item) { api_item("id" => "t1", "name" => "Tagged") }
+
+    it "gathers untagged checklists from every card in the lane" do
+      lane([tagged("cl-1", tag_item), untagged("cl-2", one)], [untagged("cl-3", two)])
+
+      group = lane_view.result_for(["<no tag>"]).groups.first
+
+      expect(group.items.map(&:name)).to eq(["One", "Two"])
+    end
+
+    it "counts its items like any other tag, and sorts first" do
+      lane([tagged("cl-1", tag_item), untagged("cl-2", one, two)])
+
+      expect(lane_view.tags.map { |t| [t.name, t.item_count] })
+        .to eq([["<no tag>", 2], ["@tag", 1]])
+    end
+
+    it "stands alone when the lane has no real tags" do
+      lane([untagged("cl-1", one)], [untagged("cl-2", two)])
+
+      expect(lane_view.tags.map { |t| [t.name, t.item_count] }).to eq([["<no tag>", 2]])
+    end
+
+    it "widens a no-tag lane past the first card when selected" do
+      lane([untagged("cl-1", one)], [untagged("cl-2", two)])
+
+      expect(lane_view.default_result.groups.flat_map { |g| g.items.map(&:name) }).to eq(["One"])
+      expect(lane_view.result_for(["<no tag>"]).groups.first.items.map(&:name)).to eq(["One", "Two"])
+    end
+
+    it "skips untagged checklists whose items are all complete" do
+      lane([tagged("cl-1", tag_item), untagged("cl-2", done)])
+
+      expect(lane_view.tags.map(&:name)).to eq(["@tag"])
+    end
+
+    it "can be selected alongside a real tag" do
+      lane([tagged("cl-1", tag_item), untagged("cl-2", one)])
+
+      result = lane_view.result_for(["@tag", "<no tag>"])
+
+      expect(result.groups.map(&:name)).to eq(["<no tag>", "@tag"])
     end
   end
 

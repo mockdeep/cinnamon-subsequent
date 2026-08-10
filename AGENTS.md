@@ -244,7 +244,10 @@ reload can't land on a row mid-click, so keep new callbacks wrapped.
 nested, no per-card fan-out. `BoardFetch` derives two things from that one
 payload: the default leaf view (still **first-card-only**) and a lane-wide tag
 index (`@words` in checklist names → incomplete items across **every card**),
-both carried on the returned `LaneView`. Toggling tag chips filters in memory via
+both carried on the returned `LaneView`. Untagged checklists index under the
+`BoardFetch::UNTAGGED` pseudo-tag `<no tag>`, which stands alone in a lane with
+no real tags (it still widens the first-card default view to the whole lane).
+Toggling tag chips filters in memory via
 `LaneView#result_for` — no refetch. The selected-tag set lives on `App`: it
 **persists across Refresh** (reconciled against the lane's current tags, vanished
 ones dropped) and **resets on a board/lane switch** (a different tag set).
