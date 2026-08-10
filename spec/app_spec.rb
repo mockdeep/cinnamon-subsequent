@@ -81,6 +81,7 @@ RSpec.describe App do
     allow(window).to receive(:on_item_toggle) { |&block| callbacks[:toggle] = block }
     allow(window).to receive(:on_tag_change) { |&block| callbacks[:tag] = block }
     allow(window).to receive(:on_limit_change) { |&block| callbacks[:limit] = block }
+    allow(window).to receive(:on_font_size_change) { |&block| callbacks[:font_size] = block }
     allow(window).to receive(:set_tags)
     allow(window).to receive(:item_limit=)
     allow(window).to receive(:show_all)
@@ -472,6 +473,17 @@ RSpec.describe App do
 
       expect(window).not_to have_received(:render)
       expect(Config.new(config.path).item_limit).to eq(2)
+    end
+  end
+
+  describe "stepping the text size" do
+    it "persists the new size without re-rendering (the window restyles itself)" do
+      app
+      callbacks[:font_size].call(16)
+
+      expect(config.font_size).to eq(16)
+      expect(Config.new(config.path).font_size).to eq(16)
+      expect(window).not_to have_received(:render)
     end
   end
 

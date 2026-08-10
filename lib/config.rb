@@ -13,10 +13,12 @@ class Config
   )
   DEFAULT_PATH = File.join(DEFAULT_DIR, "config.json")
 
+  DEFAULT_FONT_SIZE = 13
+
   DEFAULTS = {
     "trello"     => { "key" => nil, "token" => nil },
     "selection"  => { "board_id" => nil, "lane_id" => nil },
-    "appearance" => { "edge" => "right", "width" => 320 },
+    "appearance" => { "edge" => "right", "width" => 320, "font_size" => DEFAULT_FONT_SIZE },
     "view"       => { "item_limit" => nil }
   }.freeze
 
@@ -41,6 +43,13 @@ class Config
   def edge        = dig("appearance", "edge").to_sym
   def width       = dig("appearance", "width")
 
+  # Base UI font size in px, as set by the footer's A-/A+ steppers. Falls back
+  # to the default if the file was hand-edited to something unusable.
+  def font_size
+    value = dig("appearance", "font_size")
+    value.is_a?(Integer) && value.positive? ? value : DEFAULT_FONT_SIZE
+  end
+
   # Per-list cap on rendered items; nil (or anything but a positive integer,
   # in case the file was hand-edited) means unlimited.
   def item_limit
@@ -58,6 +67,10 @@ class Config
 
   def item_limit=(value)
     @data["view"]["item_limit"] = value
+  end
+
+  def font_size=(value)
+    @data["appearance"]["font_size"] = value
   end
 
   def exist?      = File.exist?(path)

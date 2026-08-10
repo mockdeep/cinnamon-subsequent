@@ -49,7 +49,10 @@ class App
   private
 
   def build_window
-    UI::DockWindow.new(edge: @config.edge, width: @config.width, header: @header)
+    UI::DockWindow.new(edge: @config.edge,
+                       width: @config.width,
+                       font_size: @config.font_size,
+                       header: @header)
   end
 
   def build_client
@@ -65,6 +68,7 @@ class App
     @window.on_item_toggle  { |row, item, desired| toggle_item(row, item, desired) }
     @window.on_tag_change   { |selected| select_tags(selected) }
     @window.on_limit_change { |limit| select_limit(limit) }
+    @window.on_font_size_change { |size| select_font_size(size) }
   end
 
   # Push a single item's new state to Trello; the row shows a spinner until
@@ -137,6 +141,13 @@ class App
     @config.item_limit = limit
     @config.save
     rerender
+  end
+
+  # User stepped the text size: the window has already restyled itself, so this
+  # only has to remember the choice for next launch.
+  def select_font_size(size)
+    @config.font_size = size
+    @config.save
   end
 
   def rerender

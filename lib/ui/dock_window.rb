@@ -6,6 +6,7 @@ require "ui/checklist_view"
 require "ui/tag_bar"
 require "ui/limit_bar"
 require "ui/session_bar"
+require "ui/styles"
 
 module UI
   # A borderless, full-height window pinned to a screen edge that reserves its
@@ -45,11 +46,12 @@ module UI
       )
     end
 
-    def initialize(edge: :right, width: 320, header:)
+    def initialize(edge: :right, width: 320, font_size: LimitBar::DEFAULT_FONT_SIZE, header:)
       super(:toplevel)
       @edge = edge
       @expanded_width = width
       @dock_width = width
+      @font_size = font_size
       @collapsed = false
       @header = header
 
@@ -87,6 +89,12 @@ module UI
       @on_limit_change = block
     end
 
+    # Called when the text size changes: block receives the new px size. The
+    # window has already restyled itself by then — this is for persisting it.
+    def on_font_size_change(&block)
+      @on_font_size_change = block
+    end
+
     # Called when a session dot is clicked: block receives the session id.
     def on_session_focus(&block)
       @on_session_focus = block
@@ -107,6 +115,16 @@ module UI
     def item_limit=(limit)
       @limit_bar.limit = limit
     end
+
+    # Restyle the whole sidebar at a new base font size, and keep the footer's
+    # steppers in step with it. Doesn't fire on_font_size_change.
+    def font_size=(size)
+      @font_size = size
+      @limit_bar.font_size = size
+      apply_css
+    end
+
+    attr_reader :font_size
 
     # Replace the displayed checklists with a freshly fetched view model.
     def render(result)
@@ -151,6 +169,13 @@ module UI
 
     private
 
+    # A stepper click: restyle immediately, then report the size upward so it
+    # can be persisted.
+    def step_font_size(size)
+      self.font_size = size
+      @on_font_size_change&.call(size)
+    end
+
     # Position, size, and strut for the current @dock_width (expanded or
     # collapsed). Re-run whenever the width changes.
     def relayout
@@ -187,7 +212,11 @@ module UI
       expanded.pack_start(@tag_bar, expand: false, fill: false, padding: 0)
       @checklist_view = ChecklistView.new
       expanded.pack_start(@checklist_view, expand: true, fill: true, padding: 0)
-      @limit_bar = LimitBar.new { |limit| @on_limit_change&.call(limit) }
+      @limit_bar =
+        LimitBar.new(
+          font_size: @font_size,
+          on_font_change: ->(size) { step_font_size(size) },
+        ) { |limit| @on_limit_change&.call(limit) }
       expanded.pack_start(@limit_bar, expand: false, fill: false, padding: 0)
 
       # Session dots live at the very bottom — a wrapping row that hides itself
@@ -242,125 +271,20 @@ module UI
       button
     end
 
+    # Build (or rebuild) the one app-level style provider. Reloading the same
+    # provider restyles every widget live, so a font-size change shows without
+    # a restart.
     def apply_css
-      css = <<~CSS
-        .dock-window { background-color: #181c25; }
-        .sidebar  { background-color: #1f2430; color: #e6e6e6; font-size: 13px; }
-        .topbar   { background-color: #181c25; border-bottom: 1px solid #3a4150; }
-        .checklist-header { color: #8fb3ff; font-size: 11px; font-weight: bold; margin-top: 6px; margin-bottom: 2px; }
-        .open-links {
-          background-image: none;
-          background-color: #2a3140;
-          color: #cdd6e6;
-          border: 1px solid #3a4150;
-          box-shadow: none;
-          text-shadow: none;
-          border-radius: 6px;
-          padding: 0 8px;
-          min-height: 0;
-          min-width: 0;
-          font-size: 11px;
-        }
-        .open-links:hover { background-color: #333b4d; }
-        .item-row { padding: 2px 0; }
-        .item-row.done label { color: #6f7787; }
-        .item-row.failed label { color: #ff8a8a; }
-        .empty-state { color: #9aa3b2; font-style: italic; }
-        .loading { color: #9aa3b2; }
-        .more-hint { color: #6f7787; font-size: 11px; font-style: italic; }
+      @provider ||= new_provider
+      @provider.load(data: Styles.sheet(@font_size))
+    end
 
-        /* Dark scrollbar. Paint trough/scrolledwindow explicitly dark (NOT
-           transparent — transparent reveals the light theme base behind the
-           scrollbar as a white strip on the edge). */
-        scrolledwindow, scrolledwindow > viewport { background-color: #1f2430; border: none; }
-        scrollbar, scrollbar trough { background-color: #1f2430; border: none; }
-        scrollbar slider { background-color: #3a4150; border: 2px solid #1f2430; border-radius: 6px; min-width: 7px; }
-        scrollbar slider:hover { background-color: #4a5468; }
-        .refresh, .collapse { padding: 2px 6px; font-size: 15px; min-width: 0; }
-
-        /* Flat, dark controls that blend into the sidebar. */
-        .topbar .dropdown,
-        .topbar button.refresh,
-        .topbar button.collapse {
-          background-image: none;
-          background-color: #2a3140;
-          color: #e6e6e6;
-          border: 1px solid #3a4150;
-          box-shadow: none;
-          text-shadow: none;
-          padding: 2px 6px;
-        }
-        .topbar .dropdown:hover,
-        .topbar button.refresh:hover,
-        .topbar button.collapse:hover { background-color: #333b4d; }
-        .topbar .dropdown .caret { color: #9aa3b2; }
-
-        /* Tag bar: wrapping row of toggle chips under the header. The flowbox
-           and its child wrappers stay transparent (selection_mode is :none, so
-           the chips carry all the visible state). */
-        .tag-bar { background-color: #181c25; border-bottom: 1px solid #3a4150; padding: 4px 6px; }
-        .tag-bar, .tag-bar flowboxchild { background-color: transparent; border: none; padding: 0; min-width: 0; min-height: 0; }
-        .tag-bar flowboxchild:selected { background-color: transparent; }
-        .tag-chip {
-          background-image: none;
-          background-color: #2a3140;
-          color: #cdd6e6;
-          border: 1px solid #3a4150;
-          box-shadow: none;
-          text-shadow: none;
-          border-radius: 10px;
-          padding: 0 8px;
-          margin: 2px;
-          min-height: 0;
-          font-size: 11px;
-        }
-        .tag-chip:hover { background-color: #333b4d; }
-        .tag-chip:checked { background-color: #34507e; color: #ffffff; border-color: #4a6aa5; }
-
-        /* Limit bar: slim strip along the window bottom holding the
-           items-per-list dropdown. */
-        .limit-bar { background-color: #181c25; border-top: 1px solid #3a4150; padding: 4px 8px; font-size: 11px; }
-        /* Child combinator: dims only the bar's own caption, not the label
-           nested inside the dropdown's face. */
-        .limit-bar > label { color: #9aa3b2; }
-        .limit-bar .dropdown {
-          background-image: none;
-          background-color: #2a3140;
-          color: #e6e6e6;
-          border: 1px solid #3a4150;
-          box-shadow: none;
-          text-shadow: none;
-          padding: 0 6px;
-          min-height: 0;
-          min-width: 0;
-        }
-        .limit-bar .dropdown:hover { background-color: #333b4d; }
-        .limit-bar .dropdown .caret { color: #9aa3b2; }
-
-        /* Session dots footer: a wrapping row of Claude-session dots pinned to
-           the window bottom. The flowbox and its child wrappers stay
-           transparent — the dots are cairo-drawn and carry all the colour. */
-        .session-bar { background-color: #181c25; border-top: 1px solid #3a4150; padding: 8px 6px; }
-
-        /* Collapsed strip */
-        .strip { background-color: #181c25; background-image: none; border: none; border-radius: 0; box-shadow: none; padding: 0; outline: none; }
-        .strip:hover { background-color: #232a36; }
-        .strip .chevron { color: #8fb3ff; font-size: 16px; }
-        .strip .strip-count { color: #e6e6e6; font-size: 12px; }
-
-        /* Popover dropdown list */
-        popover { background-color: #232a36; padding: 2px; }
-        .dropdown-list { background-color: transparent; }
-        .dropdown-list row { color: #e6e6e6; }
-        .dropdown-list row:hover { background-color: #2f3848; }
-        .dropdown-list row:selected { background-color: #34507e; color: #ffffff; }
-        checkbutton check { min-width: 14px; min-height: 14px; }
-      CSS
+    def new_provider
       provider = Gtk::CssProvider.new
-      provider.load(data: css)
       Gtk::StyleContext.add_provider_for_screen(
         Gdk::Screen.default, provider, Gtk::StyleProvider::PRIORITY_APPLICATION
       )
+      provider
     end
   end
 end

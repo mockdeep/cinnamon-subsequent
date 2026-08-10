@@ -29,6 +29,10 @@ Style/TrailingCommaInHashLiteral: { EnforcedStyleForMultiline: consistent_comma 
 Style/HashLookupMethod: { EnforcedStyle: fetch }
 Style/WordArray: { EnforcedStyle: brackets }
 
+# The stylesheet is CSS text, not logic — its length measures how much the
+# sidebar has to paint, not complexity.
+Metrics/ModuleLength: { Exclude: ['lib/ui/styles.rb'] }
+
 Bundler/GemComment: { Enabled: false }
 Bundler/GemVersion: { Enabled: false }
 Layout/SingleLineBlockChain: { Enabled: false }
