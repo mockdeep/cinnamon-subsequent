@@ -15,6 +15,10 @@ class Config
 
   DEFAULT_FONT_SIZE = 13
   DEFAULT_REFRESH_INTERVAL_MINUTES = 15
+  DEFAULT_RANDOM_COUNT = 5
+  # What the dice dropdown offers; kept here too so a hand-edited count can be
+  # validated without loading any GTK.
+  RANDOM_COUNTS = (1..9)
 
   DEFAULTS = {
     "trello"     => { "key" => nil, "token" => nil },
@@ -22,6 +26,7 @@ class Config
     "appearance" => { "edge" => "right", "width" => 320, "font_size" => DEFAULT_FONT_SIZE },
     "view"       => {
       "item_limit" => nil,
+      "random_count" => DEFAULT_RANDOM_COUNT,
       "refresh_interval_minutes" => DEFAULT_REFRESH_INTERVAL_MINUTES
     }
   }.freeze
@@ -61,6 +66,14 @@ class Config
     value.is_a?(Integer) && value.positive? ? value : nil
   end
 
+  # How many items the dice button picks. Only the count is remembered — random
+  # mode itself always starts off, so a launch shows the real list. Anything
+  # outside the dropdown's 1-9 (hand-edited) falls back to the default.
+  def random_count
+    value = dig("view", "random_count")
+    value.is_a?(Integer) && RANDOM_COUNTS.cover?(value) ? value : DEFAULT_RANDOM_COUNT
+  end
+
   # Minutes of no interaction before the list quietly refetches itself, given in
   # seconds (what AutoRefresh wants). Set the key to 0 to switch auto-refresh
   # off; a non-integer (hand-edited to nonsense) falls back to the default.
@@ -82,6 +95,10 @@ class Config
 
   def item_limit=(value)
     @data["view"]["item_limit"] = value
+  end
+
+  def random_count=(value)
+    @data["view"]["random_count"] = value
   end
 
   def font_size=(value)

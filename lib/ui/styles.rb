@@ -111,6 +111,7 @@ module UI
            nested inside the dropdown's face. */
         .limit-bar > label { color: #9aa3b2; }
         .limit-bar .dropdown,
+        .limit-bar .dice,
         .limit-bar .font-step {
           background-image: none;
           background-color: #2a3140;
@@ -123,8 +124,13 @@ module UI
           min-width: 0;
         }
         .limit-bar .dropdown:hover,
+        .limit-bar .dice:hover,
         .limit-bar .font-step:hover { background-color: #333b4d; }
         .limit-bar .dropdown .caret { color: #9aa3b2; }
+        /* The dice, pressed: same blue as a selected tag chip, so "a filter is
+           on" reads the same wherever it's switched. */
+        .limit-bar .dice { font-size: #{base + 2}px; }
+        .limit-bar .dice:checked { background-color: #34507e; color: #ffffff; border-color: #4a6aa5; }
         /* A stepper sitting on its size limit: visibly there, visibly spent. */
         .limit-bar .font-step:disabled { color: #5a616f; background-color: #232936; }
 

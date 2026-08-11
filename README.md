@@ -19,6 +19,10 @@ Trello. It pins a full-height column to the right edge of the screen that:
   own heading. A `<no tag>` chip leads the row, gathering the lane's checklists
   that carry no tag at all. With nothing selected you get the normal first-card
   view.
+- has a **dice** in the footer for when the list is too long to face — it picks a
+  handful of items at random from across the lane (or from just the tags you've
+  selected) and shows them under their tag headings. The dropdown beside it sets
+  how many. Refresh — including the automatic one — deals a fresh hand.
 - has **Board** and **Lane** dropdowns and a **Refresh** button up top (Refresh
   reloads everything — boards, lanes, and the card), and **refreshes itself**
   after 15 idle minutes so items you ticked off elsewhere disappear on their own.
@@ -147,6 +151,12 @@ find one started at login. Run the test suite with `bundle exec rake` (or
   the default view is first-card-only, `<no tag>` is useful even in a lane with
   no `@tags` at all — it widens the list to every card.
   The selection survives a Refresh but resets when you switch board or lane.
+- **The dice** narrows a long lane to a few items rather than filtering it: it
+  draws at random from whatever the chips currently allow, so pressing chips
+  while it's on re-draws from that narrower pool. An item under two tags appears
+  under both headings. The per-list cap doesn't apply while it's on — the number
+  you picked is the cap. That number is remembered (`view.random_count`); the
+  dice itself always starts unpressed, so a launch shows your real list.
 - **Refresh** reloads the whole cascade — boards, lanes, and the card (refetching
   incomplete-only) — while keeping your current selection. This is also the
   recovery path when the sidebar starts with **no network**: it shows an error and

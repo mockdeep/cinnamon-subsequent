@@ -114,6 +114,40 @@ RSpec.describe Config do
     end
   end
 
+  describe "#random_count" do
+    let(:default) { described_class::DEFAULT_RANDOM_COUNT }
+
+    it "defaults to the built-in pick size" do
+      expect(described_class.new(path).random_count).to eq(default)
+    end
+
+    it "reads a count from the file" do
+      write_config("view" => { "random_count" => 3 })
+
+      expect(described_class.new(path).random_count).to eq(3)
+    end
+
+    it "falls back to the default for a hand-edited non-integer" do
+      write_config("view" => { "random_count" => "lots" })
+
+      expect(described_class.new(path).random_count).to eq(default)
+    end
+
+    it "falls back to the default for a count the dropdown can't offer" do
+      write_config("view" => { "random_count" => 40 })
+
+      expect(described_class.new(path).random_count).to eq(default)
+    end
+
+    it "round-trips through the writer and save" do
+      config = described_class.new(path)
+      config.random_count = 7
+      config.save
+
+      expect(described_class.new(path).random_count).to eq(7)
+    end
+  end
+
   describe "#refresh_interval" do
     it "defaults to the built-in interval, in seconds" do
       expect(described_class.new(path).refresh_interval)

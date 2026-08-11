@@ -31,9 +31,15 @@ class BoardFetch
   # `limit` caps every group (default and tag views alike) at its first N items,
   # recording how many were cut in the group's hidden_count so the UI can show
   # a "+N more" hint; nil means uncapped.
+  #
+  # `ids` is the random mode: given the item ids of a pick (see `sample`), the
+  # result is those items grouped under the tags they came from, and `limit` no
+  # longer applies — the size of the pick is the cap.
   LaneView = Struct.new(:default_result, :tags, :items_by_tag, keyword_init: true) do
-    def result_for(selected, limit: nil)
-      names = Array(selected).select { |name| items_by_tag.key?(name) }.uniq.sort
+    def result_for(selected, limit: nil, ids: nil)
+      return picked(selected, ids) if ids
+
+      names = known(selected).sort
       base =
         if names.empty?
           default_result
@@ -46,7 +52,53 @@ class BoardFetch
       limit ? capped(base, limit) : base
     end
 
+    # `count` item ids drawn at random from the current selection, or the whole
+    # pool when it holds fewer than that. `rng` is injectable so specs can pin
+    # the draw.
+    def sample(selected, count:, rng: Random.new)
+      pool(selected).sample(count, random: rng).map(&:id)
+    end
+
+    # What a random pick draws from: the incomplete items of the selected tags,
+    # or of the whole lane when nothing is selected. A checklist carrying two
+    # tags puts its items in two buckets, so this de-duplicates by item id —
+    # otherwise a doubly-tagged item would get two chances at being picked.
+    def pool(selected)
+      buckets(selected).flat_map { |name| items_by_tag[name] }.uniq(&:id)
+    end
+
     private
+
+    # The pick, grouped under the tags it was drawn from: one group per tag
+    # holding at least one picked item, in name order. An item whose checklist
+    # carries two tags appears under both headings — the same way the tag
+    # filter shows it — so the rows on screen can outnumber the pick slightly.
+    def picked(selected, ids)
+      groups = buckets(selected).sort.filter_map do |name|
+        items = items_by_tag[name].select { |item| ids.include?(item.id) }
+        next if items.empty?
+
+        Group.new(checklist_id: nil, name: name, items: items)
+      end
+      # A pick that came up empty is usually "there was nothing left to draw",
+      # but not when the lane itself is the reason (no lane picked, no cards) —
+      # there the default view's message is the more useful one.
+      if groups.empty?
+        reason = default_result.empty_reason || "Nothing left — all caught up."
+      end
+      Result.new(card_name: nil, groups: groups, empty_reason: reason)
+    end
+
+    # The tag buckets a selection covers: the selected ones, or all of them
+    # when nothing is selected (or nothing selected still exists).
+    def buckets(selected)
+      names = known(selected)
+      names.empty? ? items_by_tag.keys : names
+    end
+
+    def known(selected)
+      Array(selected).select { |name| items_by_tag.key?(name) }.uniq
+    end
 
     def capped(result, limit)
       groups = result.groups.map do |group|

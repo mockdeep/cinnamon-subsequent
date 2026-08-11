@@ -116,6 +116,30 @@ RSpec.describe UI::DockWindow do
     end
   end
 
+  describe "#random_count= / #on_random_change" do
+    def dice = limit_bar.children.grep(Gtk::ToggleButton).first
+
+    it "reflects a persisted pick size on the limit bar" do
+      dock.random_count = 3
+
+      expect(limit_bar.random_count).to eq(3)
+    end
+
+    it "relays the dice to the on_random_change handler, with the size" do
+      captured = :unset
+      dock.on_random_change { |random, count| captured = [random, count] }
+      dock.random_count = 3
+
+      dice.active = true
+
+      expect(captured).to eq([true, 3])
+    end
+
+    it "is a safe no-op to press the dice when no handler is wired" do
+      expect { dice.active = true }.not_to raise_error
+    end
+  end
+
   describe "#font_size= / #on_font_size_change" do
     def stepper(text) = limit_bar.children.grep(Gtk::Button).find { |b| b.label == text }
 

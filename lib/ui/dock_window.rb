@@ -89,6 +89,12 @@ module UI
       @on_limit_change = block
     end
 
+    # Called when the dice is toggled, or its count changed while it's on:
+    # block receives (random?, count).
+    def on_random_change(&block)
+      @on_random_change = block
+    end
+
     # Called when the text size changes: block receives the new px size. The
     # window has already restyled itself by then — this is for persisting it.
     def on_font_size_change(&block)
@@ -114,6 +120,11 @@ module UI
     # Reflect a persisted per-list cap in the limit bar (without firing change).
     def item_limit=(limit)
       @limit_bar.limit = limit
+    end
+
+    # Reflect a persisted random-pick size in the limit bar (without firing).
+    def random_count=(count)
+      @limit_bar.random_count = count
     end
 
     # Restyle the whole sidebar at a new base font size, and keep the footer's
@@ -216,6 +227,7 @@ module UI
         LimitBar.new(
           font_size: @font_size,
           on_font_change: ->(size) { step_font_size(size) },
+          on_random_change: ->(random, count) { @on_random_change&.call(random, count) },
         ) { |limit| @on_limit_change&.call(limit) }
       expanded.pack_start(@limit_bar, expand: false, fill: false, padding: 0)
 
