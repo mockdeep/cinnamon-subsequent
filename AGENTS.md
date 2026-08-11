@@ -10,7 +10,8 @@ GTK3 window pinned to the right screen edge that reserves its space (maximized
 windows stop at it), shows on all workspaces, never takes focus, and renders the
 checklists of the first card in a chosen board+lane. Click an item to complete
 it (pushed to Trello immediately). A tag bar under the menu filters across all
-cards in the lane by `@tag` (parsed from checklist names). Single process,
+cards in the lane by `@tag` (parsed from checklist names), and a dice button in
+the footer swaps that view for N items drawn at random. Single process,
 Ruby + GTK3.
 
 It also folds in a **Claude Code session tracker**: a footer row of colored dots,
@@ -197,8 +198,10 @@ shelved in `.rubocop_todo.yml`, so a clean run means "no *new* offenses," not
 
 - **Trello credentials + selected board/lane:** `~/.config/cinnamon-subsequent/config.json`
   (`0600`). Never in the repo. Also holds the UI prefs the sidebar writes as you
-  change them — `appearance.font_size` (the `A−`/`A+` steppers) and
-  `view.item_limit`; both fall back to a default if hand-edited to nonsense.
+  change them — `appearance.font_size` (the `A−`/`A+` steppers),
+  `view.item_limit`, and `view.random_count` (how many the dice picks; the dice
+  being *on* is not persisted); all fall back to a default if hand-edited to
+  nonsense.
   `view.refresh_interval_minutes` is hand-edit-only (nothing in the UI writes it);
   `0` disables auto-refresh. It can't be disabled with `null` — `deep_merge`
   hands an explicit null back to the default — hence 0 as the off switch.
@@ -252,6 +255,20 @@ Toggling tag chips filters in memory via
 **persists across Refresh** (reconciled against the lane's current tags, vanished
 ones dropped) and **resets on a board/lane switch** (a different tag set).
 
+**Random mode is a third view over the same in-memory lane**, not a fetch mode.
+The footer's dice draws `view.random_count` items from `LaneView#pool` — the
+selected tags' items, or the whole lane when no chip is pressed, de-duplicated by
+id so a doubly-tagged item gets no extra chance — and `result_for(…, ids:)`
+renders them grouped under the tags they came from. Two consequences worth
+knowing: an item whose checklist carries two tags shows under both headings (so
+the rows can slightly outnumber the pick — accepted, matching how the tag filter
+already behaves), and `limit` is ignored in this mode because the pick size *is*
+the cap. `App` holds the pick as **item ids** and re-rolls at exactly four
+points: the dice, a pick-size change, a tag change, and every `finish_lane` — so
+Refresh and the idle auto-refresh both deal a fresh hand, while ticking rows off
+(which doesn't re-render) leaves the hand alone. The count is persisted; the mode
+deliberately isn't, so a launch always shows the real list.
+
 ## Architecture map
 
 - `bin/todo-sidebar` — entry point (also writes/clears the pidfile).
@@ -272,7 +289,9 @@ ones dropped) and **resets on a board/lane switch** (a different tag set).
   `dropdown`, `tag_bar` (the `@tag` filter chips), `checklist_view`, `item_row`,
   `limit_bar` (the bottom bar: the items-per-list cap, persisted as
   `view.item_limit` and applied in-memory via `LaneView#result_for(…, limit:)`,
-  plus the `A−`/`A+` text-size steppers, persisted as `appearance.font_size`),
+  the dice — whose caption and dropdown take over the cap's, meaning "how many
+  to pick" while it's pressed — plus the `A−`/`A+` text-size steppers, persisted
+  as `appearance.font_size`),
   `session_bar` + `session_dot` (the Claude-session footer dots).
 - `lib/sessions/` — `store` (reads/reaps the hook's state files into `Session`
   structs), `watcher` (the 1s poll loop), `focus` (shells out to the hook).

@@ -21,8 +21,14 @@ class App
     @lane_view = nil
     @selected_tags = Set.new
     @item_limit = config.item_limit
+    # Random mode starts off every launch (only its size is remembered), so a
+    # cold start always shows the real list.
+    @random = false
+    @random_count = config.random_count
+    @pick = nil
     wire_callbacks
     @window.item_limit = @item_limit
+    @window.random_count = @random_count
   end
 
   def start
@@ -76,6 +82,9 @@ class App
     end
     @window.on_tag_change   { |selected| interaction { select_tags(selected) } }
     @window.on_limit_change { |limit| interaction { select_limit(limit) } }
+    @window.on_random_change do |random, count|
+      interaction { select_random(random, count) }
+    end
     @window.on_font_size_change { |size| interaction { select_font_size(size) } }
     @auto_refresh.on_refresh { refresh_quietly }
   end
@@ -143,8 +152,25 @@ class App
   end
 
   # User toggled tag chips: re-render from the held lane view, no refetch.
+  # The chips stay live in random mode, where they narrow what can be drawn —
+  # so a click there deals a fresh hand from the new selection.
   def select_tags(selected)
     @selected_tags = selected.to_set
+    reroll
+    rerender
+  end
+
+  # The dice, or its count while it's on. Turning it on (or changing how many)
+  # deals a new hand; turning it off drops back to the tag/cap view. The count
+  # is persisted, the mode deliberately isn't.
+  def select_random(random, count)
+    @random = random
+    if count != @random_count
+      @random_count = count
+      @config.random_count = count
+      @config.save
+    end
+    reroll
     rerender
   end
 
@@ -167,7 +193,17 @@ class App
   def rerender
     return unless @lane_view
 
-    @window.render(@lane_view.result_for(@selected_tags, limit: @item_limit))
+    @window.render(@lane_view.result_for(@selected_tags, limit: @item_limit, ids: @pick))
+  end
+
+  # Draw a new random hand from the current selection. Held as item ids so the
+  # pick survives the re-renders that don't deserve a re-roll (a cap change,
+  # and — since ticking a row doesn't re-render — working through the list).
+  def reroll
+    @pick =
+      if @random && @lane_view
+        @lane_view.sample(@selected_tags, count: @random_count)
+      end
   end
 
   # Reload the whole cascade (boards → lanes → cards) so the dropdowns
@@ -214,11 +250,14 @@ class App
   # A freshly fetched lane: populate the tag bar and render. The selection is
   # reconciled against the lane's actual tags — a refresh keeps every selection
   # that still exists; a reset (board/lane switch) has already emptied it.
+  # Every fetch deals a fresh hand, so Refresh (and the idle auto-refresh) is
+  # also how you ask random mode for something new.
   def finish_lane(lane_view)
     @lane_view = lane_view
     @selected_tags &= lane_view.tags.to_set(&:name)
     @window.set_tags(lane_view.tags, @selected_tags)
-    @window.render(lane_view.result_for(@selected_tags, limit: @item_limit))
+    reroll
+    rerender
     busy(false)
   end
 
@@ -227,6 +266,7 @@ class App
   def finish(result)
     @lane_view = nil
     @selected_tags = Set.new
+    @pick = nil
     @window.set_tags([], @selected_tags)
     @window.render(result)
     busy(false)

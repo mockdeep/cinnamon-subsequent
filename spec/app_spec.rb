@@ -36,14 +36,20 @@ RSpec.describe App do
 
   # A real Config on disk, with credentials matching the api_url helper so the
   # real TrelloClient App builds from it hits our stubs.
-  def make_config(key: TrelloHelpers::TEST_KEY, token: TrelloHelpers::TEST_TOKEN, limit: nil, **selection)
+  def make_config(
+    key: TrelloHelpers::TEST_KEY,
+    token: TrelloHelpers::TEST_TOKEN,
+    limit: nil,
+    random_count: nil,
+    **selection
+  )
     data = {
       "trello" => { "key" => key, "token" => token },
       "selection" => {
         "board_id" => selection[:board_id],
         "lane_id" => selection[:lane_id],
       },
-      "view" => { "item_limit" => limit },
+      "view" => { "item_limit" => limit, "random_count" => random_count },
     }
     path = File.join(@config_dir, "config.json")
     File.write(path, JSON.generate(data))
@@ -87,8 +93,10 @@ RSpec.describe App do
     allow(window).to receive(:on_tag_change) { |&block| callbacks[:tag] = block }
     allow(window).to receive(:on_limit_change) { |&block| callbacks[:limit] = block }
     allow(window).to receive(:on_font_size_change) { |&block| callbacks[:font_size] = block }
+    allow(window).to receive(:on_random_change) { |&block| callbacks[:random] = block }
     allow(window).to receive(:set_tags)
     allow(window).to receive(:item_limit=)
+    allow(window).to receive(:random_count=)
     allow(window).to receive(:show_all)
     allow(window).to receive(:apply_dock_behaviour)
     allow(window).to receive(:render)
@@ -559,6 +567,149 @@ RSpec.describe App do
 
       expect(window).not_to have_received(:render)
       expect(Config.new(config.path).item_limit).to eq(2)
+    end
+  end
+
+  describe "random mode" do
+    let(:renders) { [] }
+
+    # Two cards under two tags, so a pick can be checked for reaching past the
+    # first card and for honouring the tag chips.
+    def home_card(items)
+      api_card(
+        "id" => "c1",
+        "name" => "Card",
+        "checklists" => [
+          api_checklist("id" => "cl1", "name" => "Home @home", "checkItems" => items),
+        ],
+      )
+    end
+
+    def work_card(items)
+      api_card(
+        "id" => "c2",
+        "name" => "Other",
+        "checklists" => [
+          api_checklist("id" => "cl2", "name" => "Work @work", "checkItems" => items),
+        ],
+      )
+    end
+
+    def items(prefix, count)
+      (1..count).map { |n| api_item("id" => "#{prefix}#{n}", "name" => "#{prefix.upcase}#{n}", "pos" => n) }
+    end
+
+    def rendered_names = renders.last.groups.flat_map { |group| group.items.map(&:name) }
+
+    def lane(cards) = stub_request(:get, cards_url("l1")).to_return(body: cards.to_json)
+
+    before do
+      allow(window).to receive(:render) { |result| renders << result }
+      stub_boards([api_board("id" => "b1")])
+      stub_lists("b1", [api_list("id" => "l1")])
+      lane([home_card(items("h", 3)), work_card(items("w", 3))])
+    end
+
+    it "tells the window the persisted pick size on construction" do
+      build_app(make_config(board_id: "b1", lane_id: "l1", random_count: 4))
+
+      expect(window).to have_received(:random_count=).with(4)
+    end
+
+    it "picks that many items from across the lane" do
+      app.start
+      callbacks[:random].call(true, 4)
+
+      expect(rendered_names.size).to eq(4)
+      expect(rendered_names).to all(match(/\A[HW]\d\z/))
+    end
+
+    it "groups the pick under the tags it drew from" do
+      app.start
+      callbacks[:random].call(true, 9)
+
+      expect(renders.last.groups.map(&:name)).to eq(["@home", "@work"])
+      expect(rendered_names).to contain_exactly("H1", "H2", "H3", "W1", "W2", "W3")
+    end
+
+    it "draws only from the selected tags" do
+      app.start
+      callbacks[:tag].call(Set["@work"])
+      callbacks[:random].call(true, 9)
+
+      expect(renders.last.groups.map(&:name)).to eq(["@work"])
+      expect(rendered_names).to contain_exactly("W1", "W2", "W3")
+    end
+
+    it "deals a fresh hand when the chips change" do
+      app.start
+      callbacks[:random].call(true, 9)
+      callbacks[:tag].call(Set["@home"])
+
+      expect(rendered_names).to contain_exactly("H1", "H2", "H3")
+    end
+
+    it "persists the pick size when it changes" do
+      app.start
+      callbacks[:random].call(true, 5)
+      callbacks[:random].call(true, 2)
+
+      expect(rendered_names.size).to eq(2)
+      expect(Config.new(config.path).random_count).to eq(2)
+    end
+
+    it "returns to the tag/cap view when the dice goes off" do
+      app.start
+      callbacks[:random].call(true, 1)
+      callbacks[:random].call(false, 1)
+
+      expect(renders.last.groups.map(&:name)).to eq(["Home @home"])
+      expect(rendered_names).to eq(["H1", "H2", "H3"])
+    end
+
+    it "ignores the per-list cap while it's on" do
+      app.start
+      callbacks[:limit].call(1)
+      callbacks[:random].call(true, 4)
+
+      expect(rendered_names.size).to eq(4)
+    end
+
+    # A re-roll, not a redraw of the old ids: the second fetch replaces every
+    # item, so a stale pick would render nothing.
+    it "deals a fresh hand on refresh" do
+      app.start
+      callbacks[:random].call(true, 2)
+      lane([home_card(items("n", 3))])
+      callbacks[:refresh].call
+
+      expect(rendered_names.size).to eq(2)
+      expect(rendered_names).to all(start_with("N"))
+    end
+
+    it "deals a fresh hand on an auto-refresh too" do
+      app.start
+      callbacks[:random].call(true, 2)
+      lane([home_card(items("n", 3))])
+      callbacks[:auto_refresh].call
+
+      expect(rendered_names).to all(start_with("N"))
+    end
+
+    it "reports being caught up when the pool is empty" do
+      lane([])
+      app.start
+      callbacks[:random].call(true, 3)
+
+      expect(renders.last.empty_reason).to eq("This lane has no cards.")
+    end
+
+    it "persists but renders nothing before a lane has loaded" do
+      app
+      callbacks[:random].call(true, 3)
+
+      expect(window).not_to have_received(:render)
+      expect(Config.new(config.path).random_count).to eq(3)
     end
   end
 

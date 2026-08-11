@@ -317,6 +317,148 @@ RSpec.describe BoardFetch do
     end
   end
 
+  describe "the random pick" do
+    # Two cards, so the pool has to reach past the first one: @home items on
+    # both, @work on the second, and one checklist tagged twice.
+    let(:cards) do
+      [
+        card_with(
+          id: "card-1",
+          checklists: [
+            api_checklist(
+              "id" => "cl-1",
+              "name" => "Home @home",
+              "pos" => 1,
+              "checkItems" => [
+                api_item("id" => "h1", "name" => "H1"),
+                api_item("id" => "h2", "name" => "H2"),
+              ],
+            ),
+          ],
+        ),
+        card_with(
+          id: "card-2",
+          checklists: [
+            api_checklist(
+              "id" => "cl-2",
+              "name" => "Work @work",
+              "pos" => 1,
+              "checkItems" => [
+                api_item("id" => "w1", "name" => "W1"),
+                api_item("id" => "w2", "state" => "complete"),
+              ],
+            ),
+            api_checklist(
+              "id" => "cl-3",
+              "name" => "Both @home @work",
+              "pos" => 2,
+              "checkItems" => [api_item("id" => "b1", "name" => "B1")],
+            ),
+          ],
+        ),
+      ]
+    end
+
+    # A pick of everything the pool holds, so the assertions don't depend on
+    # the draw; `sample` itself is exercised with a seeded rng below.
+    def pick_all(selected = [])
+      lane_view.sample(selected, count: 99)
+    end
+
+    before { stub_cards(cards) }
+
+    describe "#pool" do
+      it "gathers incomplete items from every card in the lane" do
+        expect(lane_view.pool([]).map(&:name)).to contain_exactly("H1", "H2", "W1", "B1")
+      end
+
+      it "counts a doubly-tagged item once, so it gets no extra chance" do
+        expect(lane_view.pool([]).map(&:id).tally["b1"]).to eq(1)
+      end
+
+      it "narrows to the selected tags" do
+        expect(lane_view.pool(["@work"]).map(&:name)).to contain_exactly("W1", "B1")
+      end
+
+      it "falls back to the whole lane when the selection no longer exists" do
+        expect(lane_view.pool(["@gone"]).size).to eq(4)
+      end
+    end
+
+    describe "#sample" do
+      it "draws the requested number of item ids" do
+        expect(lane_view.sample([], count: 2, rng: Random.new(1)).size).to eq(2)
+      end
+
+      it "draws only from the selected tags" do
+        ids = lane_view.sample(["@work"], count: 2, rng: Random.new(1))
+
+        expect(ids).to contain_exactly("w1", "b1")
+      end
+
+      it "hands back the whole pool when it's smaller than the count" do
+        expect(lane_view.sample([], count: 99, rng: Random.new(1)).size).to eq(4)
+      end
+
+      it "gives a different draw for a different rng" do
+        draws = (1..20).map { |seed| lane_view.sample([], count: 1, rng: Random.new(seed)) }
+
+        expect(draws.uniq.size).to be > 1
+      end
+    end
+
+    describe "#result_for with a pick" do
+      it "groups the picked items under the tags they came from, in name order" do
+        result = lane_view.result_for([], ids: pick_all)
+
+        expect(result.groups.map(&:name)).to eq(["@home", "@work"])
+        expect(result.groups.first.items.map(&:name)).to contain_exactly("H1", "H2", "B1")
+      end
+
+      it "shows a doubly-tagged item under both of its headings" do
+        result = lane_view.result_for([], ids: ["b1"])
+
+        expect(result.groups.map(&:name)).to eq(["@home", "@work"])
+        expect(result.groups.map { |g| g.items.map(&:id) }).to eq([["b1"], ["b1"]])
+      end
+
+      it "drops tags the pick didn't touch" do
+        result = lane_view.result_for([], ids: ["w1"])
+
+        expect(result.groups.map(&:name)).to eq(["@work"])
+      end
+
+      it "keeps to the selected tags' headings" do
+        result = lane_view.result_for(["@work"], ids: pick_all(["@work"]))
+
+        expect(result.groups.map(&:name)).to eq(["@work"])
+      end
+
+      it "ignores the per-list cap — the size of the pick is the cap" do
+        result = lane_view.result_for([], ids: pick_all, limit: 1)
+
+        expect(result.groups.first.items.size).to eq(3)
+        expect(result.groups.first.hidden_count).to be_nil
+      end
+
+      it "reports an empty pick as caught up" do
+        result = lane_view.result_for([], ids: [])
+
+        expect(result.groups).to be_empty
+        expect(result.empty_reason).to eq("Nothing left — all caught up.")
+      end
+    end
+
+    context "with a lane that has no cards" do
+      before { stub_cards([]) }
+
+      it "picks nothing, and keeps the lane's own reason for it" do
+        expect(lane_view.sample([], count: 3)).to be_empty
+        expect(lane_view.result_for([], ids: []).empty_reason).to eq("This lane has no cards.")
+      end
+    end
+  end
+
   describe "missing positions" do
     it "treats absent pos as 0 without blowing up" do
       checklist = api_checklist("checkItems" => [api_item]).tap do |cl|
