@@ -22,16 +22,41 @@ require "sessions/focus"
 PidFile.write
 at_exit { PidFile.clear }
 
+POLL_INTERVAL_MS = 1000
+
 app = App.new(Config.load)
 app.start
 app.on_session_focus { |session_id| Sessions::Focus.call(session_id) }
 
-# Continuously mirror Claude Code's session state into the footer dots. This is
-# the only polling loop in the app; the Trello side stays manual-refresh.
 watcher = Sessions::Watcher.new
 watcher.on_change do |sessions, focused_xid|
   app.update_sessions(sessions, focused_xid)
 end
-watcher.start
+
+# The app's one polling loop; the Trello side stays manual-refresh. It drives
+# two unrelated checks, each guarded so a failure in one can't stop the other:
+#
+#   watcher.tick     mirrors Claude Code's session state into the footer dots
+#   app.check_layout re-fits the window when the desktop workarea moves
+#
+# The layout check is a poll rather than a signal because GDK never announces a
+# workarea change. Verified on Cinnamon: resizing the panel moves the workarea
+# and updates GdkMonitor's own value, but notify::workarea, monitors-changed and
+# size-changed all stay silent. Both checks are cheap no-ops when nothing moved.
+poll =
+  lambda do
+    watcher.tick # rescues internally
+    begin
+      app.check_layout
+    rescue StandardError => e
+      warn("Layout check failed: #{e.message}")
+    end
+  end
+
+poll.call
+GLib::Timeout.add(POLL_INTERVAL_MS) do
+  poll.call
+  true
+end
 
 Gtk.main

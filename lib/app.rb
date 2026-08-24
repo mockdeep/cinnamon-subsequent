@@ -55,6 +55,12 @@ class App
     @window.on_session_focus(&)
   end
 
+  # Let the dock re-fit itself if the desktop workarea moved. Driven by the same
+  # poll loop as the session dots — see bin/todo-sidebar for why it's a poll.
+  def check_layout
+    @window.check_layout
+  end
+
   private
 
   def build_window

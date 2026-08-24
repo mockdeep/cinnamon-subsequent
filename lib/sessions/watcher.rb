@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
-require "gtk3"
 require "sessions/store"
 require "x11/active_window"
 
 module Sessions
-  # Polls the session state directory and the active window on a GLib timer,
-  # firing on_change only when the visible state actually changes. This is the
-  # continuous loop the old Cinnamon extension ran; it's independent of the
-  # sidebar's Trello side, which stays deliberately manual-refresh.
+  # Reads the session state directory and the active window, firing on_change
+  # only when the visible state actually changes. This is the continuous loop
+  # the old Cinnamon extension ran; it's independent of the sidebar's Trello
+  # side, which stays deliberately manual-refresh.
+  #
+  # It doesn't own a timer: bin/todo-sidebar ticks it from the sidebar's single
+  # poll loop, which drives the window layout check too.
   class Watcher
-    INTERVAL_MS = 1000
-
     def initialize(store: Store.new, active_window: X11::ActiveWindow)
       @store = store
       @active_window = active_window
@@ -20,15 +20,6 @@ module Sessions
     end
 
     def on_change(&block) = @on_change = block
-
-    # Poll once now, then every INTERVAL_MS while the GTK main loop runs.
-    def start
-      tick
-      GLib::Timeout.add(INTERVAL_MS) do
-        tick
-        true
-      end
-    end
 
     # One poll. Skips the callback when nothing the user would see changed, so
     # the pulse animation isn't reset and we don't rebuild dots every second

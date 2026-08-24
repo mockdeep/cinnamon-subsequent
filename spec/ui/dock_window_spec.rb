@@ -290,6 +290,65 @@ RSpec.describe UI::DockWindow do
     end
   end
 
+  describe "#check_layout" do
+    let(:rect)         { Struct.new(:x, :y, :width, :height) }
+    let(:strut_writes) { []                                  }
+
+    # A bottom panel's height is the thing that moves, so the workarea is held
+    # in a hash the examples can edit mid-flight.
+    let(:workarea) { { height: 1040 } }
+
+    # A 1920x1080 monitor whose workarea is shortened by that panel.
+    let(:panel_dock) do
+      described_class.new(
+        header: UI::Header.new,
+        width: 320,
+        geometry: lambda {
+          [
+            rect.new(0, 0, 1920, 1080),
+            rect.new(0, 0, 1920, workarea[:height]),
+            1920,
+          ]
+        },
+      )
+    end
+
+    before do
+      panel_dock.show_all # realize, so there's an XID to write a strut on
+      allow(X11::Strut).to receive(:apply_right) { |_xid, **options| strut_writes << options }
+      panel_dock.apply_dock_behaviour # settle at the starting layout
+    end
+
+    it "leaves the strut alone while the workarea stays put" do
+      2.times { panel_dock.check_layout }
+
+      expect(strut_writes.size).to eq(1) # only apply_dock_behaviour's
+    end
+
+    it "re-fits when a panel shrinks the workarea under it" do
+      workarea[:height] = 1000
+
+      panel_dock.check_layout
+
+      expect(strut_writes.size).to eq(2)
+      expect(strut_writes.last[:end_y]).to be < strut_writes.first[:end_y]
+    end
+
+    it "settles again once it has caught up with the new workarea" do
+      workarea[:height] = 1000
+
+      3.times { panel_dock.check_layout }
+
+      expect(strut_writes.size).to eq(2)
+    end
+
+    it "does nothing before the window is realized" do
+      unrealized = described_class.new(header: UI::Header.new, width: 320)
+
+      expect { unrealized.check_layout }.not_to raise_error
+    end
+  end
+
   describe ".layout_for" do
     it "places the dock at the right edge and scales the strut to device px" do
       rect = Struct.new(:x, :y, :width, :height)
