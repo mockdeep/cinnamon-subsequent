@@ -19,7 +19,7 @@ namespace :sidebar do
   task(:stop) { SidebarControl.stop }
 
   desc "Restart the sidebar"
-  task restart: [:stop, :start]
+  task(:restart) { SidebarControl.restart }
 
   desc "Report whether the sidebar is running"
   task(:status) { SidebarControl.status }

@@ -174,6 +174,24 @@ RSpec.describe Config do
     end
   end
 
+  describe "#malloc_check?" do
+    it "is off by default" do
+      expect(described_class.new(path).malloc_check?).to be(false)
+    end
+
+    it "is on when the file says true" do
+      write_config("debug" => { "malloc_check" => true })
+
+      expect(described_class.new(path).malloc_check?).to be(true)
+    end
+
+    it "stays off for a hand-edited truthy non-boolean" do
+      write_config("debug" => { "malloc_check" => "yes" })
+
+      expect(described_class.new(path).malloc_check?).to be(false)
+    end
+  end
+
   describe "#font_size" do
     let(:default_size) { described_class::DEFAULT_FONT_SIZE }
 
