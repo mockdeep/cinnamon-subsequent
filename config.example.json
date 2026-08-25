@@ -16,5 +16,8 @@
     "item_limit": null,
     "random_count": 5,
     "refresh_interval_minutes": 15
+  },
+  "debug": {
+    "malloc_check": false
   }
 }

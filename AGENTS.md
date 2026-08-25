@@ -47,6 +47,22 @@ recorded pid is trusted only after a liveness + identity check (`Process.kill(0,
 …)` plus one `/proc/<pid>/cmdline` read confirming it's still our launcher), so a
 stale or reused pid reads as "not running" and self-heals.
 
+**There is one launch path.** Both the rake tasks and the login autostart entry
+go through `bin/sidebarctl` → `SidebarControl.spawn_detached`, so a
+login-started instance gets the same log, environment and already-running guard
+as a hand-started one. (It didn't always: autostart used to exec
+`bin/todo-sidebar` directly with no redirect, and a crash at login left no
+record at all.) `bin/sidebarctl` stays out of Bundler deliberately — it only
+touches stdlib, so a half-installed Gemfile can't take autostart down with it.
+Anything that needs to happen on every launch belongs in `spawn_detached`, not
+in one of the callers.
+
+The log (`/tmp/todo-sidebar.log`) gets a dated `--- sidebar starting … ---` line
+per run and rotates to `.log.1` at 1MB. Setting `debug.malloc_check` in
+`config.json` relaunches under glibc's allocator checks — see README's *Chasing
+a crash*; the `LD_PRELOAD` in `MALLOC_DEBUG_ENV` is load-bearing, not belt-and-
+braces, since glibc 2.34 moved malloc_check out of libc proper.
+
 For a one-off boot check without the task machinery, run it in the foreground:
 
 ```

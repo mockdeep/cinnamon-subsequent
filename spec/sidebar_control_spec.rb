@@ -1,6 +1,19 @@
 # frozen_string_literal: true
 
+require "tmpdir"
+
 RSpec.describe SidebarControl do
+  # A scratch log per example. The banner/rotate helpers take a path precisely
+  # so these never touch the real /tmp/todo-sidebar.log.
+  around { |example| Dir.mktmpdir { |dir| @dir = dir and example.run } }
+
+  def log_path = File.join(@dir, "todo-sidebar.log")
+
+  def stub_config(malloc_check:)
+    allow(Config).to receive(:load)
+      .and_return(instance_double(Config, malloc_check?: malloc_check))
+  end
+
   describe ".start" do
     it "reports the existing pid without spawning when one is running" do
       allow(PidFile).to receive(:running_pid).and_return(4242)
@@ -80,12 +93,33 @@ RSpec.describe SidebarControl do
     end
   end
 
+  describe ".restart" do
+    it "stops then starts" do
+      allow(described_class).to receive(:stop)
+      allow(described_class).to receive(:start)
+
+      described_class.restart
+
+      expect(described_class).to have_received(:stop).ordered
+      expect(described_class).to have_received(:start).ordered
+    end
+  end
+
   describe ".spawn_detached" do
+    # Stub the config rather than reading the developer's own: with
+    # debug.malloc_check switched on for real, these would otherwise see the
+    # debug environment and fail.
+    before do
+      allow(described_class).to receive(:prepare_log)
+      stub_config(malloc_check: false)
+    end
+
     it "spawns setsid + ruby + the launcher, returning the pid" do
       allow(Process).to receive(:spawn).and_return(777)
 
       expect(described_class.spawn_detached).to eq(777)
       expect(Process).to have_received(:spawn).with(
+        {},
         "setsid",
         RbConfig.ruby,
         described_class::BIN,
@@ -93,6 +127,24 @@ RSpec.describe SidebarControl do
         out: [described_class::LOG, "a"],
         err: [:child, :out],
       )
+    end
+
+    it "adds the glibc allocator checks when config asks for them" do
+      allow(Process).to receive(:spawn).and_return(1)
+      stub_config(malloc_check: true)
+
+      described_class.spawn_detached
+
+      expect(Process).to have_received(:spawn)
+        .with(described_class::MALLOC_DEBUG_ENV.to_h, any_args)
+    end
+
+    it "stamps the log before spawning" do
+      allow(Process).to receive(:spawn).and_return(1)
+
+      described_class.spawn_detached
+
+      expect(described_class).to have_received(:prepare_log).with({})
     end
 
     it "defaults DISPLAY for a non-graphical invocation" do
@@ -113,6 +165,79 @@ RSpec.describe SidebarControl do
 
         expect(ENV.fetch("DISPLAY")).to eq(":7")
       end
+    end
+  end
+
+  describe ".child_env" do
+    it "is empty when malloc checking is off" do
+      stub_config(malloc_check: false)
+
+      expect(described_class.child_env).to eq({})
+    end
+
+    # The preload is the part that's easy to drop and silently inert: since
+    # glibc 2.34 the tunable alone does nothing without it.
+    it "preloads libc_malloc_debug alongside the tunable" do
+      stub_config(malloc_check: true)
+
+      expect(described_class.child_env).to include(
+        "LD_PRELOAD" => "libc_malloc_debug.so.0",
+        "GLIBC_TUNABLES" => "glibc.malloc.check=3",
+      )
+    end
+  end
+
+  describe ".banner" do
+    it "writes a dated line naming a plain launch" do
+      path = log_path
+      date = /\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \S+/
+      stamped = /\A--- sidebar starting #{date} ---\n\z/
+
+      described_class.banner({}, path)
+
+      expect(File.read(path)).to match(stamped)
+    end
+
+    it "records that the checks were on" do
+      path = log_path
+
+      described_class.banner(described_class::MALLOC_DEBUG_ENV, path)
+
+      expect(File.read(path)).to include("[malloc-check]")
+    end
+
+    it "appends rather than replacing" do
+      path = log_path
+      File.write(path, "earlier run\n")
+
+      described_class.banner({}, path)
+
+      expect(File.read(path)).to start_with("earlier run\n")
+    end
+  end
+
+  describe ".rotate_log" do
+    it "keeps one generation once the log passes the cap" do
+      path = log_path
+      File.write(path, "x" * (described_class::LOG_MAX_BYTES + 1))
+
+      described_class.rotate_log(path)
+
+      expect(File.exist?(path)).to be(false)
+      expect(File.size("#{path}.1")).to eq(described_class::LOG_MAX_BYTES + 1)
+    end
+
+    it "leaves a log below the cap alone" do
+      path = log_path
+      File.write(path, "small\n")
+
+      described_class.rotate_log(path)
+
+      expect(File.read(path)).to eq("small\n")
+    end
+
+    it "tolerates a log that doesn't exist yet" do
+      expect { described_class.rotate_log(log_path) }.not_to raise_error
     end
   end
 

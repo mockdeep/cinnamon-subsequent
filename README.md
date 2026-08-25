@@ -90,6 +90,7 @@ the window-manager hint APIs a dock needs).
 | `appearance.edge`      | Currently `right`                                 |
 | `appearance.width`     | Sidebar width in (logical) pixels, default `320`  |
 | `view.refresh_interval_minutes` | Idle minutes before the list refetches itself, default `15`; `0` turns auto-refresh off |
+| `debug.malloc_check`   | Launch under glibc's allocator checks, default `false` — see [Chasing a crash](#chasing-a-crash) |
 
 ## Autostart on login
 
@@ -98,8 +99,10 @@ the window-manager hint APIs a dock needs).
 ```
 
 This bakes absolute paths into `~/.config/autostart/cinnamon-subsequent.desktop`
-so it launches reliably at login (independent of your shell's PATH). Remove it
-with:
+so it launches reliably at login (independent of your shell's PATH). The entry
+runs `bin/sidebarctl start` — the same path the rake tasks use — so a
+login-started instance gets the same log and environment as one you start by
+hand, and won't double up if one is already running. Remove it with:
 
 ```
 rm ~/.config/autostart/cinnamon-subsequent.desktop
@@ -135,8 +138,30 @@ bundle exec rake sidebar:status    # is it running?
 ```
 
 They track the instance through a pidfile the app writes on boot, so they also
-find one started at login. Run the test suite with `bundle exec rake` (or
-`xvfb-run -a bundle exec rake` headless — the UI specs need a display).
+find one started at login. `bin/sidebarctl start|stop|restart|status` does the
+same thing without Bundler or rake, and is what the autostart entry runs. Run
+the test suite with `bundle exec rake` (or `xvfb-run -a bundle exec rake`
+headless — the UI specs need a display).
+
+However it's launched, the sidebar logs to `/tmp/todo-sidebar.log`, stamped with
+a dated `--- sidebar starting … ---` line per run and rotated to `.log.1` at 1MB.
+
+### Chasing a crash
+
+The sidebar links a lot of native code (GTK via gobject-introspection, plus raw
+Xlib through fiddle in `lib/x11/`), so a heap bug there surfaces as a Ruby
+`[BUG]` dump at whatever unrelated line next touched the allocator. To make the
+allocator complain at the damage instead, set in `config.json`:
+
+```json
+"debug": { "malloc_check": true }
+```
+
+then `bin/sidebarctl restart`. This launches under glibc's allocator checks —
+note it needs `LD_PRELOAD=libc_malloc_debug.so.0`, since glibc 2.34 moved the
+malloc_check machinery out of libc proper and the tunable alone is silently
+ignored. It costs some allocation speed and aborts the process on the first
+damaged chunk, so it's a diagnostic rather than something to leave on.
 
 ## Notes
 

@@ -162,6 +162,7 @@ RSpec/InstanceVariable:
     - 'spec/app_spec.rb'
     - 'spec/config_spec.rb'
     - 'spec/sessions/store_spec.rb'
+    - 'spec/sidebar_control_spec.rb'
     - 'spec/x11/active_window_spec.rb'
 
 # Offense count: 68
@@ -380,11 +381,13 @@ Style/StringConcatenation:
 Style/StringHashKeys:
   Exclude:
     - 'lib/config.rb'
+    - 'lib/sidebar_control.rb'
     - 'lib/ui/limit_bar.rb'
     - 'spec/app_spec.rb'
     - 'spec/board_fetch_spec.rb'
     - 'spec/config_spec.rb'
     - 'spec/sessions/store_spec.rb'
+    - 'spec/sidebar_control_spec.rb'
     - 'spec/support/factories.rb'
     - 'spec/trello_client_spec.rb'
     - 'spec/ui/dropdown_spec.rb'
