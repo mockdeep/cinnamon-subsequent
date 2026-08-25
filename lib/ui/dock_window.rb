@@ -46,13 +46,24 @@ module UI
       )
     end
 
-    def initialize(edge: :right, width: 320, font_size: LimitBar::DEFAULT_FONT_SIZE, header:)
+    # `geometry:` is an optional callable returning [monitor, workarea,
+    # screen_width]; it defaults to reading GDK. Injectable so specs can move the
+    # workarea under the dock without a real panel.
+    def initialize(
+      edge: :right,
+      width: 320,
+      font_size: LimitBar::DEFAULT_FONT_SIZE,
+      header:,
+      geometry: nil
+    )
       super(:toplevel)
       @edge = edge
+      @geometry = geometry
       @expanded_width = width
       @dock_width = width
       @font_size = font_size
       @collapsed = false
+      @last_layout = nil
       @header = header
 
       self.title = "cinnamon-subsequent"
@@ -178,6 +189,19 @@ module UI
       relayout
     end
 
+    # Re-fit the window if the desktop workarea has moved under us: a panel
+    # appearing, moving edge, or changing height. Polled from the sidebar's one
+    # timer rather than driven by a signal, because GDK doesn't emit one for
+    # this — notify::workarea, monitors-changed and size-changed all stay silent
+    # on a panel resize, even though GDK's own workarea value updates correctly.
+    # So we ask rather than wait to be told, and relayout's guard keeps a tick
+    # where nothing moved down to two cached GDK reads and a Struct compare.
+    #
+    # This is also how a sidebar that started before the panel mapped — the
+    # autostart race at login — heals itself instead of sitting underneath it
+    # with its bottom strip (the session dots) hidden.
+    def check_layout = relayout
+
     private
 
     # A stepper click: restyle immediately, then report the size upward so it
@@ -188,16 +212,35 @@ module UI
     end
 
     # Position, size, and strut for the current @dock_width (expanded or
-    # collapsed). Re-run whenever the width changes.
+    # collapsed). Re-run whenever the width changes, and polled by check_layout
+    # for the changes that come from outside.
+    #
+    # Applying is skipped when the computed layout matches what's already on
+    # screen. That's what makes the poll cheap enough to run every tick, and it
+    # also stops our own strut write — which itself edits _NET_WORKAREA — from
+    # feeding back into the next tick as a fresh change.
     def relayout
+      return unless window # not realized yet; apply_dock_behaviour follows
+
+      layout = current_layout
+      return if layout == @last_layout
+
+      @last_layout = layout
+      apply_layout(layout)
+    end
+
+    def current_layout
       monitor, workarea, screen_width = geometry
-      layout = self.class.layout_for(
+      self.class.layout_for(
         monitor: monitor,
         workarea: workarea,
         screen_width: screen_width,
         dock_width: @dock_width,
         scale: window.scale_factor,
       )
+    end
+
+    def apply_layout(layout)
       move(layout.x, layout.y)
       set_size_request(layout.width, layout.height)
       resize(layout.width, layout.height)
@@ -208,6 +251,8 @@ module UI
     end
 
     def geometry
+      return @geometry.call if @geometry
+
       display = Gdk::Display.default
       monitor = display.primary_monitor || display.get_monitor(0)
       [monitor.geometry, monitor.workarea, Gdk::Screen.default.width]
