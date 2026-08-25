@@ -33,7 +33,7 @@ cat > "$DESKTOP_FILE" <<EOF
 Type=Application
 Name=Todo Sidebar
 Comment=Persistent Trello checklist sidebar
-Exec=$RUBY_BIN $PROJECT_DIR/bin/todo-sidebar
+Exec=$RUBY_BIN $PROJECT_DIR/bin/sidebarctl start
 Path=$PROJECT_DIR
 X-GNOME-Autostart-enabled=true
 NoDisplay=true
@@ -42,8 +42,11 @@ EOF
 
 echo "Installed autostart entry:"
 echo "  $DESKTOP_FILE"
-echo "  Exec=$RUBY_BIN $PROJECT_DIR/bin/todo-sidebar"
+echo "  Exec=$RUBY_BIN $PROJECT_DIR/bin/sidebarctl start"
+echo
+echo "It launches via bin/sidebarctl, the same path the rake tasks use, so a"
+echo "login-started instance logs to /tmp/todo-sidebar.log like any other."
 echo
 echo "It will start on next login. To start it now without logging out:"
-echo "  $RUBY_BIN $PROJECT_DIR/bin/todo-sidebar &"
+echo "  $RUBY_BIN $PROJECT_DIR/bin/sidebarctl start"
 echo "To remove autostart: rm \"$DESKTOP_FILE\""

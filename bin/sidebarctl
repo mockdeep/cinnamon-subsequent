@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Control the sidebar from outside the project — the one entry point that both
+# `rake sidebar:*` and the login autostart entry go through, so a login-started
+# instance is launched exactly like a hand-started one (same log, same
+# environment, same already-running guard).
+#
+#   bin/sidebarctl start | stop | restart | status
+#
+# Deliberately does NOT require "bundler/setup": it only touches stdlib, and
+# staying out of Bundler means a half-installed Gemfile can't take autostart
+# down with it. bin/todo-sidebar sets Bundler up for the app process itself.
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+
+require "sidebar_control"
+
+COMMANDS = ["start", "stop", "restart", "status"].freeze
+
+command = ARGV.first
+
+unless COMMANDS.include?(command)
+  warn("usage: #{File.basename($PROGRAM_NAME)} #{COMMANDS.join(" | ")}")
+  exit(1)
+end
+
+SidebarControl.public_send(command)

@@ -24,6 +24,7 @@ class Config
     "trello"     => { "key" => nil, "token" => nil },
     "selection"  => { "board_id" => nil, "lane_id" => nil },
     "appearance" => { "edge" => "right", "width" => 320, "font_size" => DEFAULT_FONT_SIZE },
+    "debug"      => { "malloc_check" => false },
     "view"       => {
       "item_limit" => nil,
       "random_count" => DEFAULT_RANDOM_COUNT,
@@ -84,6 +85,13 @@ class Config
     minutes = value.is_a?(Integer) ? value : DEFAULT_REFRESH_INTERVAL_MINUTES
     minutes.positive? ? minutes * 60 : nil
   end
+
+  # Launch the sidebar under glibc's allocator checks? A diagnostic for heap
+  # corruption from the Xlib/GObject side, off by default: it slows every
+  # allocation and turns a survivable inconsistency into an immediate abort.
+  # Read by SidebarControl at spawn time, so it only takes effect on a restart.
+  # Anything but a literal `true` (including a hand-edited string) reads as off.
+  def malloc_check? = dig("debug", "malloc_check") == true
 
   def board_id=(value)
     @data["selection"]["board_id"] = value
