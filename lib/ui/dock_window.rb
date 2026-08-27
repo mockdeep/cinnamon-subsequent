@@ -250,12 +250,44 @@ module UI
                              end_y: layout.strut_end_y)
     end
 
+    # GDK hands back the same display, screen and monitors on every poll, and
+    # glib2 caches each one's Ruby wrapper on the GObject itself — in qdata
+    # that holds no GC reference. Once we drop our last reference the wrapper
+    # is collected while that cache goes on pointing at the freed slot, so a
+    # later poll is handed an already-freed object and segfaults inside the
+    # next introspection call, walking the GC freelist.
+    #
+    # This is what killed the sidebar every few hours. Reproduced: unpinned
+    # dies within ~20k polls, pinned ran 330k+ clean. So we hold on to every
+    # GDK object we're handed for the life of the process — a pinned wrapper
+    # is exactly what the cache keeps handing back, so it can never go stale.
+    #
+    # The names are prefixed because Gtk::Widget already defines #display and
+    # #screen, which we must not shadow.
     def geometry
       return @geometry.call if @geometry
 
-      display = Gdk::Display.default
-      monitor = display.primary_monitor || display.get_monitor(0)
-      [monitor.geometry, monitor.workarea, Gdk::Screen.default.width]
+      monitor = pinned_monitor
+      [monitor.geometry, monitor.workarea, pinned_screen.width]
+    end
+
+    # Both are fixed for the process's lifetime, so memoising is the whole of
+    # the pinning they need.
+    def pinned_display = @pinned_display ||= Gdk::Display.default
+
+    def pinned_screen = @pinned_screen ||= Gdk::Screen.default
+
+    # Re-read every poll, because the primary monitor genuinely changes when a
+    # monitor is plugged in or the primary is reassigned. Retaining each one we
+    # get keeps its wrapper alive across polls that land on a different
+    # monitor; the list is bounded by the number of physical monitors.
+    def pinned_monitor
+      display = pinned_display
+      current = display.primary_monitor || display.get_monitor(0)
+      @pinned_monitors ||= []
+      known = @pinned_monitors.any? { |monitor| monitor.equal?(current) }
+      @pinned_monitors << current unless known
+      current
     end
 
     def build_content
