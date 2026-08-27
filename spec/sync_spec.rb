@@ -63,6 +63,6 @@ RSpec.describe Sync do
     )
     pump_until { messages.any? }
 
-    expect(messages.first).to match(/Sync error: boom/)
+    expect(messages.first).to include("Sync error: boom")
   end
 end
