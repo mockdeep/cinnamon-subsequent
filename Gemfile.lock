@@ -4,52 +4,51 @@ GEM
     addressable (2.9.0)
       public_suffix (>= 2.0.2, < 8.0)
     ast (2.4.3)
-    atk (4.3.6)
-      glib2 (= 4.3.6)
+    atk (4.3.8)
+      glib2 (= 4.3.8)
       rake
     bigdecimal (4.1.2)
     cairo (1.18.5)
       pkg-config (>= 1.2.2)
       red-colors
-    cairo-gobject (4.3.6)
+    cairo-gobject (4.3.8)
       cairo (>= 1.16.2)
-      glib2 (= 4.3.6)
+      glib2 (= 4.3.8)
     crack (1.0.1)
       bigdecimal
       rexml
     diff-lcs (1.6.2)
-    docile (1.4.1)
     fiddle (1.1.8)
-    gdk3 (4.3.6)
-      cairo-gobject (= 4.3.6)
-      gdk_pixbuf2 (= 4.3.6)
-      pango (= 4.3.6)
+    gdk3 (4.3.8)
+      cairo-gobject (= 4.3.8)
+      gdk_pixbuf2 (= 4.3.8)
+      pango (= 4.3.8)
       rake
-    gdk_pixbuf2 (4.3.6)
-      gio2 (= 4.3.6)
+    gdk_pixbuf2 (4.3.8)
+      gio2 (= 4.3.8)
       rake
-    gio2 (4.3.6)
+    gio2 (4.3.8)
       fiddle
-      gobject-introspection (= 4.3.6)
-    glib2 (4.3.6)
+      gobject-introspection (= 4.3.8)
+    glib2 (4.3.8)
       native-package-installer (>= 1.0.3)
       pkg-config (>= 1.3.5)
-    gobject-introspection (4.3.6)
-      glib2 (= 4.3.6)
-    gtk3 (4.3.6)
-      atk (= 4.3.6)
-      gdk3 (= 4.3.6)
+    gobject-introspection (4.3.8)
+      glib2 (= 4.3.8)
+    gtk3 (4.3.8)
+      atk (= 4.3.8)
+      gdk3 (= 4.3.8)
     hashdiff (1.2.1)
-    json (2.19.9)
-    language_server-protocol (3.17.0.5)
+    json (2.21.2)
+    language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
     matrix (0.4.3)
     native-package-installer (1.1.9)
-    pango (4.3.6)
-      cairo-gobject (= 4.3.6)
-      gobject-introspection (= 4.3.6)
+    pango (4.3.8)
+      cairo-gobject (= 4.3.8)
+      gobject-introspection (= 4.3.8)
     parallel (2.1.0)
-    parser (3.3.11.1)
+    parser (3.3.12.0)
       ast (~> 2.4.1)
       racc
     pkg-config (1.6.5)
@@ -76,8 +75,8 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.7)
-    rubocop (1.87.0)
-      json (~> 2.3)
+    rubocop (1.90.0)
+      json (>= 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
       parallel (>= 1.10)
@@ -87,7 +86,7 @@ GEM
       rubocop-ast (>= 1.49.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
-    rubocop-ast (1.49.1)
+    rubocop-ast (1.50.0)
       parser (>= 3.3.7.2)
       prism (~> 1.7)
     rubocop-rake (0.7.1)
@@ -98,16 +97,11 @@ GEM
       regexp_parser (>= 2.0)
       rubocop (~> 1.86, >= 1.86.2)
     ruby-progressbar (1.13.0)
-    simplecov (0.22.0)
-      docile (~> 1.1)
-      simplecov-html (~> 0.11)
-      simplecov_json_formatter (~> 0.1)
-    simplecov-html (0.13.2)
-    simplecov_json_formatter (0.1.4)
+    simplecov (1.1.1)
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
-    webmock (3.26.2)
+    webmock (3.26.4)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
@@ -129,30 +123,29 @@ DEPENDENCIES
 CHECKSUMS
   addressable (2.9.0) sha256=7fdf6ac3660f7f4e867a0838be3f6cf722ace541dd97767fa42bc6cfa980c7af
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
-  atk (4.3.6) sha256=b0ca3352c70ba17ec7a99a3a11454c5261bd5b24e7a3e9711d86f6dd32aa74fa
+  atk (4.3.8) sha256=58b0b35b0e2722a176c41525443b4a0cad84a938b242cd47e26408154de9e414
   bigdecimal (4.1.2) sha256=53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd
   bundler (4.0.19) sha256=b48056e4c77fb3853cc47775b5447ede44aaa4f53c32f168014ab4fe86587d47
   cairo (1.18.5) sha256=e57356141c91748061b10260e185735bd6e2288ab81ab300a6de3adfa270a623
-  cairo-gobject (4.3.6) sha256=66e8b6ed3f78d8c7bb389b08a6b68e756ac95df02ed2433cc94ac03101a4abc3
+  cairo-gobject (4.3.8) sha256=ce713ad7800d811d514a3a26a979d4f17aa53712135a1023c946c03aee5d93ec
   crack (1.0.1) sha256=ff4a10390cd31d66440b7524eb1841874db86201d5b70032028553130b6d4c7e
   diff-lcs (1.6.2) sha256=9ae0d2cba7d4df3075fe8cd8602a8604993efc0dfa934cff568969efb1909962
-  docile (1.4.1) sha256=96159be799bfa73cdb721b840e9802126e4e03dfc26863db73647204c727f21e
   fiddle (1.1.8) sha256=7fa8ee3627271497f3add5503acdbc3f40b32f610fc1cf49634f083ef3f32eee
-  gdk3 (4.3.6) sha256=8567ed324de1226fa7cfb5ee2e51e70adc589822c0e277f40276b6d9abc48e8b
-  gdk_pixbuf2 (4.3.6) sha256=c2565b92f1ea79063625dc3c36e17cfe7d9d536751d4ab79cffde05d2c221bc6
-  gio2 (4.3.6) sha256=51d37db1614124b4dc0f7fd967cf90a37afb36e12e61de532cd9c21492ded5a5
-  glib2 (4.3.6) sha256=d21cec76d847363b4c1864aeb848133e705a0dbc35dbc4753016822dcf80e1cc
-  gobject-introspection (4.3.6) sha256=6f09f66555bec243e258238be76b5d530604e88c1ba069d76a1b6613bc75876b
-  gtk3 (4.3.6) sha256=aded2114051b3290ebbe9170287de6dfcc06ddc5127d56543ebedd2e80a69c99
+  gdk3 (4.3.8) sha256=e429429e600d2cefd8169d02b0e676d6ebaf2a71cae05b21ac7a23aae502a054
+  gdk_pixbuf2 (4.3.8) sha256=7e8aed522aefa3bf7c04adb6588ed97570455d9c2cdb8694cd9c58f6e71b5c8e
+  gio2 (4.3.8) sha256=06f4ea5e31ed7910f619dea2ef56a2b349e6da470f77005c63e9d48170c7df44
+  glib2 (4.3.8) sha256=7b8c4dac3884c65f220552eef9f22e2ca4fa20fba06ec80161842b6c119671b4
+  gobject-introspection (4.3.8) sha256=c5b068b9330f97d5e4cdeb747ad7645d3ec2bbbf9fa16e61a0f8b4f9f34a0521
+  gtk3 (4.3.8) sha256=6b57475bd29ca0b4af4999665e8f8e16a56810d049594fe4599f2f1afc4a5f08
   hashdiff (1.2.1) sha256=9c079dbc513dfc8833ab59c0c2d8f230fa28499cc5efb4b8dd276cf931457cd1
-  json (2.19.9) sha256=9b9025b7cdddafa38d316eca0b2358488e42d417045c1b90d216a9fefe46b79a
-  language_server-protocol (3.17.0.5) sha256=fd1e39a51a28bf3eec959379985a72e296e9f9acfce46f6a79d31ca8760803cc
+  json (2.21.2) sha256=1f1d3b7cf2b3ba1a69beca0bb6db13d5438b80bff3cd54cdaaa620b9b07c1c6a
+  language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   matrix (0.4.3) sha256=a0d5ab7ddcc1973ff690ab361b67f359acbb16958d1dc072b8b956a286564c5b
   native-package-installer (1.1.9) sha256=fbb41b6b22750791a4304f0a0aeea3dd837668892117f49c4caf2e8e0f4e792f
-  pango (4.3.6) sha256=04ebb355a78b20fac0153d320452b5e2d4c3624ed35ce54c526c90df767cbedc
+  pango (4.3.8) sha256=c078a0670acab131933ea96c213f3070152a8b93ac4beccae77e3aabf91b64be
   parallel (2.1.0) sha256=b35258865c2e31134c5ecb708beaaf6772adf9d5efae28e93e99260877b09356
-  parser (3.3.11.1) sha256=d17ace7aabe3e72c3cc94043714be27cc6f852f104d81aa284c2281aecc65d54
+  parser (3.3.12.0) sha256=21a6d7f755d5a24dfbdc6e6b772e4e879a52e7631a88bc5a3a134606052c9828
   pkg-config (1.6.5) sha256=33f9f81c5322983d22b439b8b672f27777b406fea23bfec74ff14bbeb42ec733
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
   public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
@@ -167,17 +160,15 @@ CHECKSUMS
   rspec-expectations (3.13.5) sha256=33a4d3a1d95060aea4c94e9f237030a8f9eae5615e9bd85718fe3a09e4b58836
   rspec-mocks (3.13.8) sha256=086ad3d3d17533f4237643de0b5c42f04b66348c28bf6b9c2d3f4a3b01af1d47
   rspec-support (3.13.7) sha256=0640e5570872aafefd79867901deeeeb40b0c9875a36b983d85f54fb7381c47c
-  rubocop (1.87.0) sha256=b9d9ddf55116a513f8ef2c7ae660662d8b49301f118d3f0df61865b33a5c188d
-  rubocop-ast (1.49.1) sha256=4412f3ee70f6fe4546cc489548e0f6fcf76cafcfa80fa03af67098ffed755035
+  rubocop (1.90.0) sha256=9eb4c065b5c5154e4ef554c547972f3905a9eb6b53e657e580b6796b54bf8242
+  rubocop-ast (1.50.0) sha256=b9ca88300da0803ee222ad20cdb30494c0a784eed06fdc35d254b06d662788db
   rubocop-rake (0.7.1) sha256=3797f2b6810c3e9df7376c26d5f44f3475eda59eb1adc38e6f62ecf027cbae4d
   rubocop-rspec (3.10.2) sha256=0b3e2ecc592cd10ecbf0095bb58d1e357905276e069643523cc19eb7495f65e2
   ruby-progressbar (1.13.0) sha256=80fc9c47a9b640d6834e0dc7b3c94c9df37f08cb072b7761e4a71e22cff29b33
-  simplecov (0.22.0) sha256=fe2622c7834ff23b98066bb0a854284b2729a569ac659f82621fc22ef36213a5
-  simplecov-html (0.13.2) sha256=bd0b8e54e7c2d7685927e8d6286466359b6f16b18cb0df47b508e8d73c777246
-  simplecov_json_formatter (0.1.4) sha256=529418fbe8de1713ac2b2d612aa3daa56d316975d307244399fa4838c601b428
+  simplecov (1.1.1) sha256=25825ef13f0b2e74694d769817dad6ab8e90131dabdaa666e522fea105521e78
   unicode-display_width (3.2.0) sha256=0cdd96b5681a5949cdbc2c55e7b420facae74c4aaf9a9815eee1087cb1853c42
   unicode-emoji (4.2.0) sha256=519e69150f75652e40bf736106cfbc8f0f73aa3fb6a65afe62fefa7f80b0f80f
-  webmock (3.26.2) sha256=774556f2ea6371846cca68c01769b2eac0d134492d21f6d0ab5dd643965a4c90
+  webmock (3.26.4) sha256=8d8da206d217ebe6968cfb09c77f4533c23074e1432bad865f3994eacbaad50d
 
 BUNDLED WITH
   4.0.19

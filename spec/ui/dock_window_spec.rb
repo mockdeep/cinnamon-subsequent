@@ -141,7 +141,9 @@ RSpec.describe UI::DockWindow do
   end
 
   describe "#font_size= / #on_font_size_change" do
-    def stepper(text) = limit_bar.children.grep(Gtk::Button).find { |b| b.label == text }
+    def stepper(text)
+      limit_bar.children.grep(Gtk::Button).find { |b| b.label == text }
+    end
 
     it "starts at the size it was built with" do
       window = described_class.new(header: UI::Header.new, font_size: 17)
