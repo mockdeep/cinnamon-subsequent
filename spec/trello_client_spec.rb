@@ -18,6 +18,15 @@ RSpec.describe TrelloClient do
       expect { client.boards }
         .to raise_error(TrelloClient::Error, /500/)
     end
+
+    it "keeps the response body out of the error message" do
+      stub_request(:get, url)
+        .to_return(status: [403, "Forbidden"], body: "<html>captcha</html>")
+
+      expect { client.boards }
+        .to raise_error(TrelloClient::Error, /403 Forbidden\z/)
+        .and(output(/403.*captcha/).to_stderr)
+    end
   end
 
   describe "#lists" do

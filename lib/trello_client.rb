@@ -80,11 +80,17 @@ class TrelloClient
       http.request(http_request)
     end
 
-    unless response.is_a?(Net::HTTPSuccess)
-      raise Error, "Trello #{verb_class::METHOD} #{path} → " \
-                   "#{response.code} #{response.message}: #{response.body}"
-    end
+    fail!(verb_class, path, response) unless response.is_a?(Net::HTTPSuccess)
 
     JSON.parse(response.body)
+  end
+
+  # The message is shown in the sidebar, so it stays one short line. The body
+  # (which can be a whole HTML page, e.g. a captcha) goes to the log instead.
+  def fail!(verb_class, path, response)
+    summary = "Trello #{verb_class::METHOD} #{path} → " \
+              "#{response.code} #{response.message}"
+    warn("#{summary}: #{response.body}") unless response.body.to_s.empty?
+    raise Error, summary
   end
 end

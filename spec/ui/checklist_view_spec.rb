@@ -23,6 +23,12 @@ RSpec.describe UI::ChecklistView do
       expect(rows.first.label).to eq("Nothing here.")
     end
 
+    it "lets the empty-state label break inside long words" do
+      view.render(make_result(groups: [], empty_reason: "x" * 500))
+
+      expect(rows.first.wrap_mode).to eq(Pango::WrapMode::WORD_CHAR)
+    end
+
     it "renders a header, an item row per item, and a spacer per group" do
       group = make_group(
         name: "List A",
