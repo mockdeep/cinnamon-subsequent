@@ -25,9 +25,17 @@ window can cover. See "The session dots" below.
 It's a GUI app on **X11** (`DISPLAY=:0`), so you can launch it and see it on
 screen — prefer that over guessing.
 
-Build deps: the `gtk3` gem builds native extensions and needs **`libgtk-3-dev`**
-(`sudo apt install libgtk-3-dev`); the rest of the chain is already present.
-Ruby is mise-managed — always run via `bundle exec`.
+Build deps: the gems build native extensions and need **`libgtk-3-dev`** and
+**`libgirepository1.0-dev`** (`sudo apt install libgtk-3-dev
+libgirepository1.0-dev`). Install both by name, or `apt autoremove` can take
+them away. Ruby is mise-managed — always run via `bundle exec`.
+
+Gems live per Ruby install, and autostart follows mise's `latest` path, so a
+Ruby upgrade leaves the next launch with no gems. That launch tries to rebuild
+them in the background, where it can't prompt for sudo, so a missing dev package
+looks like a crash: no sidebar, and a `Gem::Ext::BuildError` in the log. After
+upgrading Ruby, run `bundle install` by hand first (`sidebar:start` waits only
+about 4s, so a first build through it reports failure even if it's working).
 
 **Prefer the `rake sidebar:*` tasks** to run and cycle an instance — for a visual
 check, `rake sidebar:start`, inspect, then `rake sidebar:stop`:
