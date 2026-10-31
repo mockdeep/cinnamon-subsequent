@@ -107,6 +107,9 @@ module UI
       label = Gtk::Label.new(reason || "Nothing here.")
       label.xalign = 0
       label.wrap = true
+      # Break inside long words too, or an unbroken run (a URL, an error
+      # payload) forces the window wider than the screen edge.
+      label.wrap_mode = :word_char
       label.style_context.add_class("empty-state")
       label
     end
